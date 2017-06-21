@@ -2,7 +2,7 @@ MAX_NUM_FREQ    = 128
 TIME_WNDW_SIZE  = 120
 
 NumNodes        = 14
-NumRes          = 5
+NumRes          = 10
 
 guard_band  = 1
 Lambda      = 1
@@ -62,3 +62,6 @@ LINK_SELF           = 10000 + LINK_RAND_MAX
 
 TERMINATE_CHAR      = '1'
 
+ERR_INSTR           = 0
+DON_INSTR           = 1
+PAS_INSTR           = 2

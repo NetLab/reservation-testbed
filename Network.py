@@ -259,39 +259,83 @@ class Network:
         return arrivingRes
 
     def UpdateLinkRes(self):
-        arrivingRes         = self.AllocateArrivingRes()
+        arrivingRes     = self.AllocateArrivingRes()
+        resToLinkDict   = {}
+        resInstr        = [ERR_INSTR] * len(arrivingRes)    # Default list of instructions for each res
 
-        for link in self.linkDict:
-            linkRes = []  # List of reservations for this link in this step
-            for res in arrivingRes:
-                isDone, nodes = res.IsResDone()
-                if isDone:                 # If the reservation has reached its final node
-                    arrivingRes.pop(arrivingRes.index(res)) # Delete it
-                    if nodes is not None:
-                        self.completedResList.append(nodes)
-                    else:
-                        print("ERROR: UpdateLinkRes -> invalid completed node pair")
-                        raise
-                    self.completedRes += 1                  # Record that the reservation has reached end of path
-                elif FormatLinkName_String(res.GetNextPathLink()) == link: # If not completed, check if res belongs to current link
-                    linkRes.append(
-                        arrivingRes.pop(arrivingRes.index(res)) # Move res from arriving res list
-                    )                                           ## to reservations for current link
-            self.linkDict[link].LoadArrivingRes(linkRes)  # Load reservations into current links waiting list
+        for link in self.linkDict:  # For each link
+            resToLinkDict[link]   = []    # Initialize an empty list of reservations to be loaded
 
-        if len(arrivingRes) > 0:
+        index = 0
+        for res in arrivingRes:
+            print("Index", index)
+            isDone, nodes = res.IsResDone()
+            #print("For", res.GetSrcDst(), "on path", res.GetNextPathLink())
+            if isDone:
+                #print("Was Done")
+                resInstr[index] = DON_INSTR
+
+                if nodes is not None:
+                    self.completedResList.append(nodes)
+                    self.completedRes += 1
+                else:
+                    print("ERROR: UpdateLinkRes -> invalid completed node pair")
+                    raise
+            else:   # If reservation is not done
+                #print("Is forwarded to")
+                for link in self.linkDict:
+                    if FormatLinkName_String(res.GetNextPathLink()) == link:
+                        resInstr[index] = PAS_INSTR
+                        #print(link)
+                        resToLinkDict[link].append(res)
+            index += 1
+        print("Index", index)
+
+        print(resInstr)
+
+        for link in resToLinkDict:  # For each link
+            if len(resToLinkDict[link]) > 0:    # If any res to be loaded for the respective link
+                self.linkDict[link].LoadArrivingRes(resToLinkDict[link])    # Load the list of res for that link
+
+        for instr in resInstr:
+            if instr < 1 or instr > 2:
+                print("Arriving Res List not Cleared")
                 print("Arriving Res at", self.time)
                 self.DEBUG_PrintListOfRes(arrivingRes)
-                for link in self.linkDict:
-                    print(link)
-                for res in arrivingRes:
-                    print("FM", FormatLinkName_String(res.GetNextPathLink()))
                 raise
+        #
+        # for link in self.linkDict:
+        #     linkRes = []  # List of reservations for this link in this step
+        #     for res in arrivingRes:
+        #         isDone, nodes = res.IsResDone()
+        #         print(FormatLinkName_String(res.GetNextPathLink()), link, FormatLinkName_String(res.GetNextPathLink()) == link)
+        #         if isDone:                 # If the reservation has reached its final node
+        #             arrivingRes.pop(arrivingRes.index(res)) # Delete it
+        #             if nodes is not None:
+        #                 self.completedResList.append(nodes)
+        #             else:
+        #                 print("ERROR: UpdateLinkRes -> invalid completed node pair")
+        #                 raise
+        #             self.completedRes += 1                  # Record that the reservation has reached end of path
+        #         elif FormatLinkName_String(res.GetNextPathLink()) == link: # If not completed, check if res belongs to current link
+        #             linkRes.append(
+        #                 arrivingRes.pop(arrivingRes.index(res)) # Move res from arriving res list
+        #             )                                           ## to reservations for current link
+        #             print("Arriving Res list iteration for ", self.time)
+        #             self.DEBUG_PrintListOfRes(arrivingRes)
+        #
+        #     self.linkDict[link].LoadArrivingRes(linkRes)  # Load reservations into current links waiting list
 
-        if len(arrivingRes) != 0:
-            print("ERROR: UpdateLinkRes -> Some Reservations Not Allocated:")
-            print(self.DEBUG_PrintListOfRes(arrivingRes))
-            raise
+        # if len(arrivingRes) > 0:
+        #         print("Arriving Res List not Cleared")
+        #         print("Arriving Res at", self.time)
+        #         self.DEBUG_PrintListOfRes(arrivingRes)
+        #         raise
+        #
+        # if len(arrivingRes) != 0:
+        #     print("ERROR: UpdateLinkRes -> Some Reservations Not Allocated:")
+        #     print(self.DEBUG_PrintListOfRes(arrivingRes))
+        #     raise
 
     def RunCurrentTimeStep(self):
         for link in self.linkDict:
@@ -307,6 +351,8 @@ class Network:
     def MainFunction(self, my_lambda):
         self.CreateMultRes(my_lambda)
         self.initialResList = deepcopy(self.arrivingResList)
+        print("Initial Reservations")
+        self.DEBUG_PrintListOfRes(self.initialResList)
 
         for time in range(0,1000):
             self.UpdateLinkRes()
