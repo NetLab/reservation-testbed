@@ -268,11 +268,8 @@ class Network:
 
         index = 0
         for res in arrivingRes:
-            print("Index", index)
             isDone, nodes = res.IsResDone()
-            #print("For", res.GetSrcDst(), "on path", res.GetNextPathLink())
             if isDone:
-                #print("Was Done")
                 resInstr[index] = DON_INSTR
 
                 if nodes is not None:
@@ -282,16 +279,11 @@ class Network:
                     print("ERROR: UpdateLinkRes -> invalid completed node pair")
                     raise
             else:   # If reservation is not done
-                #print("Is forwarded to")
                 for link in self.linkDict:
                     if FormatLinkName_String(res.GetNextPathLink()) == link:
                         resInstr[index] = PAS_INSTR
-                        #print(link)
                         resToLinkDict[link].append(res)
             index += 1
-        print("Index", index)
-
-        print(resInstr)
 
         for link in resToLinkDict:  # For each link
             if len(resToLinkDict[link]) > 0:    # If any res to be loaded for the respective link
@@ -382,15 +374,15 @@ class Network:
             ReportError("MainFuction", errMsg, info = errInfo)
             #raise NetworkError
 
-        print("Initial Reservations")
-        self.DEBUG_PrintListOfRes(self.initialResList)
+#        print("Initial Reservations")
+#        self.DEBUG_PrintListOfRes(self.initialResList)
 
         print("Reservations Completed", self.completedRes)
         blocking = 0
         for link in self.linkDict:
             blocking += self.linkDict[link].GetNumBlocks()
-        for res in self.completedResList:
-            print(res)
+#        for res in self.completedResList:
+#            print(res)
         print("Total number of blocks:", blocking)
 
 class NetworkError(Exception):

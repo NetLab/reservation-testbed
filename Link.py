@@ -1,6 +1,7 @@
 from operator import attrgetter
 from Constants import *
 from Reservation import *
+from copy import deepcopy
 
 class Link:
     def __init__(self, nodes, length):
@@ -55,17 +56,18 @@ class Link:
     #   Add a reservation to the links forwarding list
     def AddToFwdList(self, res):
         res.IncrementPath() # Mark the reservation to continue to next step of its path when it is called
-        res.SetNextTime(res.start_t + res.holding_t)    # Set arrival/start of next step to after current completes
+        res.SetNextTime(res.start_t + res.holding_t + 1)    # Set arrival/start of next step to after current completes
 #        print("Next start time", res.start_t + res.holding_t)
         self.fwdResList.append(res)
         self.fwdResList.sort(key=lambda x: x.arrival_t)    # Sort the list by the first item of each sublist (end time)
 
     def GetFwdingRes(self):
-        fwdingRes = []
-        for res in self.fwdResList:
-            if res.arrival_t - 1 == self.curTime:   # If the end time of the reservation = 1 + current time:
-                resToRemove = self.fwdResList.index(res)    # Get index of forwarded reservation to move
-                fwdingRes.append(self.fwdResList.pop(resToRemove))  # Move res to the list to a list to be returned
+        fwdingRes = deepcopy(self.fwdResList)
+#        for res in self.fwdResList:
+#            if res.arrival_t - 1 == self.curTime:   # If the end time of the reservation = 1 + current time:
+#                resToRemove = self.fwdResList.index(res)    # Get index of forwarded reservation to move
+#                fwdingRes.append(self.fwdResList.pop(resToRemove))  # Move res to the list to a list to be returned
+        self.fwdResList.clear()
         return fwdingRes
 
     def GetFwdResList(self):
@@ -92,8 +94,6 @@ class Link:
             if avail >= size:   # If a space of suitable size is found
                 return True, startIndex # Return that there is a suitable open space, and its start index
             index += 1  # Increment the index
-        print("*********************HERE***************")
-        print(self.nodes)
         return False, startIndex    # If no suitable space is found, return False and None
 
     def PlaceRes(self, startIndex, size, depth):
