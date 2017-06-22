@@ -102,6 +102,6 @@ def GetNumberSlots(size_req):
 # Arrival = 15
 # Start = 110
 # numslots = 16
-# holding time  = 298
+# holding time  = 298 (actual 320)
 
 

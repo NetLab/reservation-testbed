@@ -200,10 +200,10 @@ class Network:
         res.SetPath(self.FindShortestPath(src, dst))  # Find and set the shortest path it can take
         self.arrivingResList.append(res)
 
-    def CreateMultRes(self, my_lambda):
+    def CreateMultRes(self, my_lambda, numRes):
         i = 0
         nodes = self.GetNodes()
-        while i < NumRes:
+        while i < numRes:
             self.CreateRes(my_lambda, nodes)
             i += 1
         self.SortResByArrival()
@@ -340,8 +340,8 @@ class Network:
 
     # ======================================= M a i n   F u n c t i o n ==========================================
 
-    def MainFunction(self, my_lambda):
-        self.CreateMultRes(my_lambda)
+    def MainFunction(self, my_lambda, numRes):
+        self.CreateMultRes(my_lambda, numRes)
         self.initialResList = deepcopy(self.arrivingResList)
         print("Initial Reservations")
         self.DEBUG_PrintListOfRes(self.initialResList)
@@ -385,6 +385,12 @@ class Network:
 #            print(res)
         print("Total number of blocks:", blocking)
 
+        if(numRes != blocking + self.completedRes):
+            ReportError("MainFunction", "Not all of {0} reservations blocked: {1}, or completed: {2}".format(numRes, blocking, self.completedRes))
+            raise NetworkError
+
+
+
 class NetworkError(Exception):
     pass
 
@@ -402,4 +408,4 @@ test = Network(NumNodes, LinkList)
 #test.PrintLinks()
 #test.PrintNodeLinks()
 #print(test.FindShortestPath("M","C"))
-test.MainFunction(1)
+test.MainFunction(1, 10)
