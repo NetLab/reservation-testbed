@@ -12,15 +12,18 @@ class Reservation:
             randDst = nodes[randint(0, len(nodes) - 1)]  # Randomly assign dest node from list
         self.destNode   = randDst
 
-        self.path       = None
-        self.nextLink   = None
-        self.arrival_t  = GetArrivalTime(my_lambda)
-        self.book_t     = GetBkAheadTime()
-        self.holding_t  = GetHoldingTime()
-        self.start_t    = self.arrival_t + self.book_t
-        self.size_req   = GetSizeRequest()
-        self.num_slots  = GetNumberSlots(self.size_req)
+        self.path           = None
+        self.nextLink       = None
+        self.linkIndex      = None
 
+        self.arrival_t      = self.GenArrivalTime(my_lambda)
+        self.book_t         = self.GenBkAheadTime()
+        self.holding_t      = self.GenHoldingTime()
+        self.start_t        = self.arrival_t + self.book_t
+        self.size_req       = self.GenSizeRequest()
+        self.num_slots      = self.GenNumberSlots(self.size_req)
+
+    # Used for overloading randomly generated reservations (load in specific attributes for a reservation)
     def Load(self, nodes, arrival_t, start_t, holding_t, num_slots):
         self.sourceNode = nodes[0]
         self.destNode   = nodes[1]
@@ -29,9 +32,11 @@ class Reservation:
         self.holding_t  = holding_t
         self.num_slots  = num_slots
 
+    # Get the source and destination nodes and return them as a list
     def GetSrcDst(self):
         return self.sourceNode, self.destNode
 
+    # Get the path of the reservation
     def GetPath(self):
         return self.path
 
@@ -54,9 +59,32 @@ class Reservation:
     def GetNextPathLink(self):
         return self.nextLink
 
+    # For use in CheckInitialPathOpen in Network. Used to get list of links to verify res does not block at first arrival
+    def GetAllPathLinks(self):
+        if self.path == None:       # Raise error if res has no path at this point
+            raise
+
+        listLinks = []
+
+        for index in range(0, len(self.path) - 2):
+            listLinks.append(FormatLinkName_String(self.path[index:index+2]))  # Get each link name that the path will go through
+
+        return listLinks
+
     def SetNextTime(self, nextTime):    # Sets time for link to next immediately start. Used for telling
         self.arrival_t  = nextTime      # res arrives at next link after it completes current step
         self.start_t    = nextTime      # res does not wait upon arriving, so starts as it arrives
+
+    def IsOnFirstLink(self):
+        return self.path[0:2] == self.nextLink
+
+    # Get the slot index where the reservation is continuously allocated
+    def GetLinkIndex(self):
+        return self.linkIndex
+
+    # Set the slot index where the reservation is to be continuously allocated
+    def SetLinkIndex(self, linkIndex):
+        self.linkIndex = linkIndex
 
     def GetNextTime(self):
         return self.arrival_t
@@ -64,13 +92,13 @@ class Reservation:
     def GetHoldingTime(self):
         return self.holding_t
 
-    def GetNumBlocks(self):
+    def GetNumSlots(self):
         return self.num_slots
 
     def IsResDone(self):
         try:
             if self.nextLink[1] == TERMINATE_CHAR:
-                print("Reservation", self.sourceNode, self.destNode, "complete")
+                #print("Reservation", self.sourceNode, self.destNode, "complete")
                 return True, (self.sourceNode, self.destNode)
             else:
                 return False, None
@@ -78,25 +106,26 @@ class Reservation:
             print(self.nextLink, self.path)
             raise
 
-def GetArrivalTime(my_lambda):
-    #seed()
-    randNum = uniform(0.0000000000000001, 1)
-    return round((-1 * log(randNum))/my_lambda)
 
-def GetHoldingTime():
-    #seed()
-    return ceil((-1 * log(uniform(0.0000000000000001, 1)))/Mu)
+    def GenArrivalTime(self, my_lambda):
+        #seed()
+        randNum = uniform(0.0000000000000001, 1)
+        return round((-1 * log(randNum))/my_lambda)
 
-def GetBkAheadTime():
-    #seed()
-    return randint(1,100)
+    def GenHoldingTime(self):
+        #seed()
+        return ceil((-1 * log(uniform(0.0000000000000001, 1)))/Mu)
 
-def GetSizeRequest():
-    #seed()
-    return 200 - (randint(1,16) * 12.5)
+    def GenBkAheadTime(self):
+        #seed()
+        return randint(1,100)
 
-def GetNumberSlots(size_req):
-    return ceil((size_req/12.5) + guard_band)
+    def GenSizeRequest(self):
+        #seed()
+        return 200 - (randint(1,16) * 12.5)
+
+    def GenNumberSlots(self, size_req):
+        return ceil((size_req/12.5) + guard_band)
 
 #Theoretical Maximums with lambda 1:
 # Arrival = 15
@@ -104,4 +133,9 @@ def GetNumberSlots(size_req):
 # numslots = 16
 # holding time  = 298 (actual 320)
 
+def FormatLinkName_List(node1, node2):
+    return "".join(sorted(node1 + node2))
+
+def FormatLinkName_String(nodes):
+    return "".join(sorted(nodes))
 

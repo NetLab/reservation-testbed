@@ -2,7 +2,7 @@ MAX_NUM_FREQ    = 128
 TIME_WNDW_SIZE  = 320       # Maximum theoretical holding time is around 320
 
 NumNodes        = 14
-NumRes          = 500
+NumRes          = 10
 
 guard_band  = 1
 Lambda      = 1
@@ -65,3 +65,7 @@ TERMINATE_CHAR      = '1'
 ERR_INSTR           = 0
 DON_INSTR           = 1
 PAS_INSTR           = 2
+BLK_INSTR           = 3
+
+MIN_INSTR           = ERR_INSTR
+MAX_INSTR           = BLK_INSTR

@@ -8,6 +8,7 @@ class Link:
         self.timeWindow     = [[EMPTY] * MAX_NUM_FREQ] * TIME_WNDW_SIZE  ## Declare 2D array of Empty (False) time periods and frequencies
         self.nodes          = nodes
         self.length         = length
+        self.onFirstLink    = True
         self.initResList    = []
         self.currResList    = []
         self.fwdResList     = []
@@ -41,13 +42,20 @@ class Link:
 
     def UpdateCurrReservations(self):
         update = self.CheckNeedUpdate()
-
+        if update:
+            print("Initial")    #############################DEBUG#################################
+            self.DEBUG_PrintFirstWindowLine()
         while(update):
             tempRes = self.currResList.pop(0)
-            spaceOpen, spaceIndex = self.CheckOpenSpace(tempRes.num_slots)  # See if window can fit the res, if so where
-            if spaceOpen:
-                self.PlaceRes(spaceIndex, tempRes.num_slots, tempRes.holding_t) # Place the reservation in the window
+            resSpace    = tempRes.GetLinkIndex()
+            resSize     = tempRes.GetNumSlots()
+            resTime     = tempRes.GetHoldingTime()
+            #spaceOpen, spaceIndex = self.CheckOpenSpace(tempRes.num_slots)  # See if window can fit the res, if so where
+            if self.CheckContinuousSpace(resSpace, resSize) == EMPTY:
+                self.PlaceRes(resSpace, resSize, resTime) # Place the reservation in the window
                 self.AddToFwdList(tempRes)      # Only once the reservation is actually placed do we add to fwdList
+                print("Update")
+                self.DEBUG_PrintFirstWindowLine()
             else:
                 self.numBlocks += 1
             update = self.CheckNeedUpdate()
@@ -96,6 +104,42 @@ class Link:
             index += 1  # Increment the index
         return False, startIndex    # If no suitable space is found, return False and None
 
+    def GetListOfOpenSpaces(self, size):
+        listOfSpaces    = []    # List of spaces of size(size) in the current link
+        avail           = 0
+        index           = 0
+        startIndex      = None
+
+        for space in self.timeWindow[0]:    # For each space in the current row
+            if space == EMPTY:  # If space is empty
+                if avail == 0:      # If start of new space to be checked
+                    startIndex = index  # Record the start index of the space
+                avail += 1          # Increment the counter of available space
+            elif space == FULL: # Else if its full
+                avail = 0           # Reset the counter of available space
+                startIndex = None   # Reset the start index of the space
+            else:   # Should not get here
+                print("ERROR: CheckOpenSpace -> Time Window Space =", space)
+                raise
+
+            if avail >= size:   # If a space of suitable size or greater is found
+                # startIndex + (avail - size0 is appended as to get first available space, plus each following space
+                listOfSpaces.append(startIndex + (avail - size))    # append the index of the open space (first or subsequent)
+            index += 1  # Increment the index
+
+        if len(listOfSpaces) <= 0:  # If no available spaces of size(size)
+            return False, listOfSpaces  # Return false
+        else:
+            return True, listOfSpaces   # If at least one suitable space is found, return true and the list of suitable spaces
+
+    # For checking if a space exists starting from a current start index
+    def CheckContinuousSpace(self, startIndex, size):
+        for space in range(0, size):
+            if self.timeWindow[startIndex + space] == FULL:
+                return FULL
+
+        return EMPTY
+
     def PlaceRes(self, startIndex, size, depth):
         i = 0
         j = 0
@@ -121,6 +165,16 @@ class Link:
         self.timeWindow.append([EMPTY] * MAX_NUM_FREQ)
         self.curTime += 1
 
+    # -------------------------- D e b u g   T o o l s -----------------------------
+    def DEBUG_PrintFirstWindowLine(self):
+        print("Node", self.nodes)
+        for value in self.timeWindow[0]:
+            if value == EMPTY:
+                print('-', end='')
+            else:
+                print('X', end='')
+        print('')   # Print a final newline
+
     # =========================================== M a i n   P r o c e s s =========================================
     def RunTimeStep(self):
         self.UpdateCurrReservations()
@@ -145,17 +199,6 @@ class Link:
 
     def GetLinkNodes(self):
         return self.nodes[0], self.nodes[1]
-
-
-
-def FormatLinkName_List(node1, node2):
-    return "".join(sorted(node1 + node2))
-
-def FormatLinkName_String(nodes):
-    return "".join(sorted(nodes))
-
-
-
 
 # testNode = Network()
 # i = 1

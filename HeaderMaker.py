@@ -31,4 +31,4 @@ def MakeHeader(commentChar, fillChar, header, length, endChar, hasEnd = False, c
     textHeader[sideLen + i] = ' '
     print(''.join(textHeader))
 
-MakeHeader('#', '-', "Forwarding Reservations", 80, ' ')
+MakeHeader('#', '-', "Debug Tools", 80, ' ')
