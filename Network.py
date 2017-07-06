@@ -10,13 +10,15 @@ class Network:
         self.linkDict           = {}
 
         self.initialResList     = []
+        self.resToBeSlotted     = []
         self.completedResList   = []
 
         self.arrivingResList    = []  # Dictionary reservations that will arrive in the next time unit
 
         self.time               = 0
         self.completedRes       = 0
-        self.arrivingBlocking   = 0
+        self.immediateBlocking  = 0
+        self.promisedBlocking   = 0
 
         self.debugFirstLink     = 0
 
@@ -278,17 +280,13 @@ class Network:
         spaceOptions    = []  # Options for continuous blocks of space to check in path
         pathSpace       = None # The final decided continuous (persistent) start location for the reservation
         hasPath         = False
-        DEBUG_index     = 0
+        DEBUG_i     = 0
 
         size            = res.GetNumSlots() # get the size in slots of the request
         listLinks       = res.GetAllPathLinks()
-        print(listLinks)
         spacesFound, spaceOptions    = self.linkDict[listLinks[0]].GetListOfOpenSpaces(size) # Possible cont. spaces in init. link
-#        print("DEBUG LIST OF SPACES", spaceOptions)
 
-        print(listLinks[0], "has", len(spaceOptions), "spaces")
         if spacesFound == False:    # If no spaces are found
-            print("Returned False 1")
             return False, pathSpace
         elif len(listLinks) == 1:  # If only one link in path
             return True, spaceOptions[0]    # Return that a path was found, and the first spot found
@@ -297,10 +295,8 @@ class Network:
             for link in listLinks[1:]:  # For each link beyond the first in the path
                 if self.linkDict[link].CheckContinuousSpace(space, size) == FULL:   # Check each possible space
                     hasPath = False
-                    print("Conflict with", listLinks.index(link))
                     break                   # If the space is full in any link, move on to the next possible space
                 else:
-                    print("Success")
                     hasPath = True
 
             if hasPath == True:         # If any possible space is empty on every link
@@ -311,24 +307,26 @@ class Network:
             print("Oops, I did something wrong")
             raise
 
-        print("Returned False 2")
         return hasPath, pathSpace
 
     # Get all arriving reservations, then load them to their corresponding link or complete them
     def UpdateLinkRes(self):
 
         arrivingRes     = self.AllocateArrivingRes()
+
         resToLinkDict   = {}    # Dictionary of each link, each entry contains list of res arriving at link
+        slottableRes    = []    # Reservations that may possibly be slotted
+        slottedRes      = []    # Reservations that are successully slotted
         resInstr        = [ERR_INSTR] * len(arrivingRes)    # List of instructions for processing res; default to all err
 
         for link in self.linkDict:  # For each link
             resToLinkDict[link]   = []    # Initialize an empty list of reservations to be loaded
 
-        index = 0   # index of current res arriving
+        i = 0   # index of current res arriving
         for res in arrivingRes:
             isDone, nodes = res.IsResDone()
             if isDone:
-                resInstr[index] = DON_INSTR
+                resInstr[i] = DON_INSTR
 
                 if nodes is not None:
                     self.completedResList.append(nodes)
@@ -340,25 +338,39 @@ class Network:
             else:   # If reservation is not done
 
                 if res.IsOnFirstLink(): # If this is the first link the res arrives on
-                    hasSpace, slotIndex = self.CheckInitialPathOpen(res)    # Check if res can be continuous, and where
-
-                    if hasSpace == False:   # If no continuous space was found
-                        self.arrivingBlocking += 1  # increment number of arrival blocked res
+                    hasSpace, slot = self.CheckInitialPathOpen(res)    # Check if res can be continuous, and where
+                    if hasSpace == False:           # If no continuous space was found
+                        self.immediateBlocking += 1      # increment number of arrival blocked res
                         print("BLOCKED on", res.sourceNode + res.destNode, "of size", res.num_slots)
-                        resInstr[index] = BLK_INSTR # Record res as blocked
-                        continue                    # continue to next res in arrivingRes
-                    else:
-                        res.SetLinkIndex(slotIndex) # Set the slot index that the res will continuously occupy
+                        resInstr[i] = BLK_INSTR     # Record res as blocked
+                        continue                        # continue to next res in arrivingRes
+                    elif res.start_t == self.time + 1:  # Only give the res an index if it is about to start
+                        res.SetLinkIndex(slot)     # Set the slot index that the res will continuously occupy
 
-                for link in self.linkDict:
-                    if FormatLinkName_String(res.GetNextPathLink()) == link:
-                        resInstr[index] = PAS_INSTR
-                        resToLinkDict[link].append(res)
-            index += 1
+                for link in self.linkDict:  # For each link
+                    if FormatLinkName_String(res.GetNextPathLink()) == link:    # if the reservation is for the link
+                        resInstr[i] = PAS_INSTR     # Label the reservation as a pass (successfully forwarded or started)
+                        resToLinkDict[link].append(res) # Append the res to its next link
+            i += 1
 
+        for link in resToLinkDict:
+            slottedRes      = []    # clear the list of slotted res for each new link
+            slottableRes    = self.linkDict[link].GetSlottableRes() # Get list of res that require slotting from link
+            for res in slottableRes:
+                hasSpace, slot = self.CheckInitialPathOpen(res)
+                if hasSpace:
+                    res.SetLinkIndex(slot)
+                    slottedRes.append(res)
+                else:
+                    self.promisedBlocking += 1
+
+            self.linkDict[link].LoadResToLink(slottedRes)   # Load all successfully slotted res into link
+
+
+        # Load all arriving res to their respective links
         for link in resToLinkDict:  # For each link
             if len(resToLinkDict[link]) > 0:    # If any res to be loaded for the respective link
-                self.linkDict[link].LoadArrivingRes(resToLinkDict[link])    # Load the list of res for that link
+                self.linkDict[link].LoadResToLink(resToLinkDict[link])    # Load the list of res for that link
 
         for instr in resInstr:
             if instr < MIN_INSTR or instr > MAX_INSTR:
@@ -371,6 +383,7 @@ class Network:
     def RunCurrentTimeStep(self):
         for link in self.linkDict:
             fwdedResList = self.linkDict[link].RunTimeStep()
+##            self.resToBeSlotted = self.linkDict[link].GetSlottableRes()
             self.arrivingResList += fwdedResList
 
     # ======================================= M a i n   F u n c t i o n ==========================================
@@ -378,16 +391,11 @@ class Network:
     def MainFunction(self, my_lambda, numRes):
         self.CreateMultRes(my_lambda, numRes)
         self.initialResList = deepcopy(self.arrivingResList)
-        #print("Initial Reservations")
-        #self.DEBUG_PrintListOfRes(self.initialResList)
 
         for time in range(0,1000):
             self.UpdateLinkRes()
             self.RunCurrentTimeStep()
             self.time += 1
-#            if(len(self.arrivingResList) > 0):
-#                print("Res List at", self.time)
-#                self.DEBUG_PrintListOfRes(self.arrivingResList)
 
         for link in self.linkDict:
             unforwardedResList = self.linkDict[link].GetFwdResList()
@@ -407,22 +415,16 @@ class Network:
                 errInfo.append(
                     "Reservation {0} with next link {1} arriving at {2}".format(res.GetSrcDst(), res.GetNextPathLink(), res.GetNextTime()))
             ReportError("MainFuction", errMsg, info = errInfo)
-            #raise NetworkError
-
-#        print("Initial Reservations")
-#        self.DEBUG_PrintListOfRes(self.initialResList)
+            raise NetworkError
 
         print("Of", numRes, "initial reservations")
         print("Reservations Completed", self.completedRes)
-        localBlocking   = self.arrivingBlocking    # Get number of local blocks
-        linkBlocking    = 0
+        localBlocking   = self.immediateBlocking    # Get number of local blocks
+        linkBlocking    = self.promisedBlocking
         for link in self.linkDict:
             linkBlocking += self.linkDict[link].GetNumBlocks()  # Add the number of blocks occurring in each link
         totalBlocking = localBlocking + linkBlocking
-#        for res in self.completedResList:
-#            print(res)
         print("Total number of blocks:", totalBlocking, "\n", localBlocking, "blocked initially and", linkBlocking, "due to conflict")
-        print("DEBUG", self.debugFirstLink)
 
         if(numRes != totalBlocking + self.completedRes):
             ReportError("MainFunction", "Not all of {0} reservations blocked: {1}, or completed: {2}".format(numRes, totalBlocking, self.completedRes))

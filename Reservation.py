@@ -32,10 +32,12 @@ class Reservation:
         self.holding_t  = holding_t
         self.num_slots  = num_slots
 
+    # --------------- S o u r c e   a n d   D e s t i n a t i o n ------------------
     # Get the source and destination nodes and return them as a list
     def GetSrcDst(self):
         return self.sourceNode, self.destNode
 
+    # --------------------------------- P a t h ------------------------------------
     # Get the path of the reservation
     def GetPath(self):
         return self.path
@@ -71,29 +73,8 @@ class Reservation:
 
         return listLinks
 
-    def SetNextTime(self, nextTime):    # Sets time for link to next immediately start. Used for telling
-        self.arrival_t  = nextTime      # res arrives at next link after it completes current step
-        self.start_t    = nextTime      # res does not wait upon arriving, so starts as it arrives
-
     def IsOnFirstLink(self):
         return self.path[0:2] == self.nextLink
-
-    # Get the slot index where the reservation is continuously allocated
-    def GetLinkIndex(self):
-        return self.linkIndex
-
-    # Set the slot index where the reservation is to be continuously allocated
-    def SetLinkIndex(self, linkIndex):
-        self.linkIndex = linkIndex
-
-    def GetNextTime(self):
-        return self.arrival_t
-
-    def GetHoldingTime(self):
-        return self.holding_t
-
-    def GetNumSlots(self):
-        return self.num_slots
 
     def IsResDone(self):
         try:
@@ -106,11 +87,30 @@ class Reservation:
             print(self.nextLink, self.path)
             raise
 
+    # ----------------------------- I n d e x i n g --------------------------------
+    # Get the slot index where the reservation is continuously allocated
+    def GetLinkIndex(self):
+        return self.linkIndex
+
+    # Set the slot index where the reservation is to be continuously allocated
+    def SetLinkIndex(self, linkIndex):
+        self.linkIndex = linkIndex
+
+    # --------------------------------- T i m e ------------------------------------
+    def SetNextTime(self, nextTime):    # Sets time for link to next immediately start. Used for telling
+        self.arrival_t  = nextTime      # res arrives at next link after it completes current step
+        self.start_t    = nextTime      # res does not wait upon arriving, so starts as it arrives
+
+    def GetNextTime(self):
+        return self.arrival_t
 
     def GenArrivalTime(self, my_lambda):
         #seed()
         randNum = uniform(0.0000000000000001, 1)
         return round((-1 * log(randNum))/my_lambda)
+
+    def GetHoldingTime(self):
+        return self.holding_t
 
     def GenHoldingTime(self):
         #seed()
@@ -120,9 +120,14 @@ class Reservation:
         #seed()
         return randint(1,100)
 
+    # ---------------------- N u m b e r   o f   S l o t s -------------------------
+
     def GenSizeRequest(self):
         #seed()
         return 200 - (randint(1,16) * 12.5)
+
+    def GetNumSlots(self):
+        return self.num_slots
 
     def GenNumberSlots(self, size_req):
         return ceil((size_req/12.5) + guard_band)

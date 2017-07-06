@@ -31,4 +31,4 @@ def MakeHeader(commentChar, fillChar, header, length, endChar, hasEnd = False, c
     textHeader[sideLen + i] = ' '
     print(''.join(textHeader))
 
-MakeHeader('#', '-', "Debug Tools", 80, ' ')
+MakeHeader('#', '-', "Number of Slots", 80, ' ')
