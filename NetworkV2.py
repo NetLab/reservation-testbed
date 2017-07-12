@@ -1,5 +1,6 @@
 from LinkV2 import *
 from copy import deepcopy
+from time import *
 
 # Routing and Network Assignment
 
@@ -309,27 +310,77 @@ class Network:
         # Reservations cannot be deleted in the middle of a list search, so their indexes are saved to be deleted after
         arrivedOrIBlocked_Index     = []
         completeOrPBlocked_Index    = []
+        DEBUG_CIPO1_Avg     = 0
+        DEBUG_CIPO1_Num     = 0
+        DEBUG_Init_Avg      = 0
+        DEBUG_Init_Num      = 0
+        DEBUG_Arri_Avg      = 0
+        DEBUG_Arri_Num      = 0
+        DEBUG_Check_Avg     = 0
+        DEBUG_Check_Num     = 0
+        DEBUG_HasP_Avg      = 0
+        DEBUG_HasP_Num      = 0
+        DEBUG_NoP_Avg       = 0
+        DEBUG_NoP_Num       = 0
+
+        DEBUG_Total_Time    = clock()
 
         self.CreateMultRes(my_lambda, numRes)
         self.SortInitResByArrivalT()
+
+        smallCheck = clock()
+        i = 0
+        for res in self.initialResList:
+            if res.arrival_t == 5000:
+                i += 1
+        smallCheck = clock() - smallCheck
+        print("Small Check", smallCheck)
+
+
         for time in range(0, TIME_WNDW_SIZE):
 
             newResArrived   =   False   # Each time, t, set newResArrived to false; check if need to re-sort arrivedResList
             arrivedOrIBlocked_Index.clear()
 
+
+            DEBUG_Init_Num += 1
+            DEBUG_Init_Time = clock()
             for res in self.initialResList:
+                i = 0
                 if res.arrival_t == time:   # If the Res arrives at this time
+                    DEBUG_CIPO1_Num     += 1
+                    DEBUG_CIPO1_Time    = clock()
                     hasPath, pathSpace = self.CheckInitialPathOpen(res) # Check to see if there is an opening
+                    DEBUG_CIPO1_Time    = clock() - DEBUG_CIPO1_Time
+                    DEBUG_CIPO1_Avg     += DEBUG_CIPO1_Time
+
+                    DEBUG_Check_Num     += 1
+                    DEBUG_Check_Time    = clock()
                     if hasPath:
+                        DEBUG_HasP_Num += 1
+                        DEBUG_HasP_Time = clock()
                         self.arrivingResList.append(res)
-                        arrivedOrIBlocked_Index.append(self.initialResList.index(res)) # Queue the res for deletion
+                        arrivedOrIBlocked_Index.append(i) # Queue the res for deletion
                         newResArrived = True    # Set to true if any new res arrive
+                        DEBUG_HasP_Time = clock() - DEBUG_HasP_Time
+                        DEBUG_HasP_Avg += DEBUG_HasP_Time
                     else:
+                        DEBUG_NoP_Num += 1
+                        DEBUG_NoP_Time = clock()
                         self.immediateBlocking += 1
-                        arrivedOrIBlocked_Index.append(self.initialResList.index(res)) # Queue the res for deletion
+                        arrivedOrIBlocked_Index.append(i) # Queue the res for deletion
+                        DEBUG_NoP_Time = clock() - DEBUG_NoP_Time
+                        DEBUG_NoP_Avg += DEBUG_NoP_Time
+
+                    DEBUG_Check_Time    = clock() - DEBUG_Check_Time
+                    DEBUG_Check_Avg     += DEBUG_Check_Time
                 else:
                     break   # As the lsit is ordered by time: if any do not match, move on to the next step; Checking arrived res
+                i += 1
 
+
+            DEBUG_Init_Time = clock() - DEBUG_Init_Time
+            DEBUG_Init_Avg += DEBUG_Init_Time
             # Clear out res that arrive or immediately block
             arrivedOrIBlocked_Index.sort(reverse=True) # Sort indexes from low to high as deleting reindexes later entries
             for index in arrivedOrIBlocked_Index:
@@ -338,23 +389,32 @@ class Network:
             completeOrPBlocked_Index.clear()
             if newResArrived:   # If any new reservations have arrived
                 self.SortArrivingResByStartT()  # Sort arriving res list if new res have arrived
+
+            DEBUG_Arri_Num += 1
+            DEBUG_Arri_Time = clock()
             for res in self.arrivingResList:
+                i = 0
                 if res.GetStartT() == time:
                     hasPath, pathSpace = self.CheckInitialPathOpen(res)  # Check to see if there is an opening
                     if hasPath:
                         self.AllocateAcrossLinks(pathSpace, res)
-                        completeOrPBlocked_Index.append(self.arrivingResList.index(res))
+                        completeOrPBlocked_Index.append(i)
                         self.completedRes += 1
                     else:
                         self.promisedBlocking += 1
-                        completeOrPBlocked_Index.append(self.arrivingResList.index(res))
+                        completeOrPBlocked_Index.append(i)
                 else:
                     break   # As the lsit is ordered by time: if any do not match, move on to the next step
+                i += 1
 
             # Clear out res that complete or promise block
             completeOrPBlocked_Index.sort(reverse=True)  # Sort indexes from low to high as deleting reindexes later entries
             for index in completeOrPBlocked_Index:
                 self.arrivingResList.pop(index)
+
+            DEBUG_Arri_Time = clock() - DEBUG_Arri_Time
+            DEBUG_Arri_Avg += DEBUG_Arri_Time
+
 
         localBlocking = self.immediateBlocking  # Get number of local blocks
         linkBlocking = self.promisedBlocking
@@ -368,9 +428,18 @@ class Network:
         if(numRes != totalBlocking + self.completedRes):
             ReportError("MainFunction", "Not all of {0} reservations blocked: {1}, or completed: {2}".format(numRes, totalBlocking, self.completedRes))
             raise NetworkError
+        DEBUG_Total_Time = clock() - DEBUG_Total_Time
 
-        return(self.completedRes, localBlocking, linkBlocking, totalBlocking)
-
+        if(True):
+            print("DEBUG_CIPO1 Average", DEBUG_CIPO1_Avg/DEBUG_CIPO1_Num, "Total", DEBUG_CIPO1_Avg)
+            print("DEBUG_Check Average", DEBUG_Check_Avg/DEBUG_Check_Num, "Total", DEBUG_Check_Avg)
+            print("DEBUG_Init Average", DEBUG_Init_Avg / DEBUG_Init_Num, "Total", DEBUG_Init_Avg)
+            print("DEBUG_Arri Average", DEBUG_Arri_Avg / DEBUG_Arri_Num, "Total", DEBUG_Arri_Avg)
+            print("DEBUG_HasPath Average", DEBUG_HasP_Avg / DEBUG_HasP_Num, "Total", DEBUG_HasP_Avg)
+            print("DEBUG_HasNoPath Average", DEBUG_NoP_Avg / DEBUG_NoP_Num, "Total", DEBUG_NoP_Avg)
+            print("Total Time", DEBUG_Total_Time)
+#        return(self.completedRes, localBlocking, linkBlocking, totalBlocking)
+        return DEBUG_Total_Time
 
 
 class NetworkError(Exception):
@@ -385,9 +454,17 @@ def ReportError(funct, msg, info = None):
 def DEBUG_print(msg):
     print(msg)
 
-test = Network(NumNodes, LinkList)
-test.MainFunction(Lambda, NumRes, info = True)
-#
+#test = Network(NumNodes, LinkList)
+#total = test.MainFunction(Lambda, NumRes, info = True)
+
+avgTotal = 0
+for x in range(0,1):
+    test = Network(NumNodes, LinkList)
+    total = test.MainFunction(Lambda, NumRes, info=True)
+    avgTotal += total
+print("total", avgTotal/10)
+
+    #
 # completeVsBlockRatios = []
 #
 # initLambda = 2.3
