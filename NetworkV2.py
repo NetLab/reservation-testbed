@@ -1,0 +1,427 @@
+from LinkV2 import *
+from copy import deepcopy
+
+# Routing and Network Assignment
+
+class Network:
+    def __init__(self, numNodes, linkVals):
+        self.nodeDict           = {}
+        self.pathDict           = {}
+        self.linkDict           = {}
+
+        self.initialResList     = []
+        self.arrivingResList    = []
+        self.resToBeSlotted     = []
+        self.completedResList   = []
+
+        self.arrivingResList    = []  # Dictionary reservations that will arrive in the next time unit
+
+        self.time               = 0
+        self.completedRes       = 0
+        self.immediateBlocking  = 0
+        self.promisedBlocking   = 0
+
+        self.debugFirstLink     = 0
+
+        self.InitNodes(numNodes)
+        self.InitLinkList(linkVals)
+
+    # ========================================= N o d e   F u n c t i o n s =======================================
+    # --------------------------- I n i t -------------------------
+    def InitNodes(self, numNodes):      # Initiate a list of nodes on the network from a list of tuples
+        self.nodeDict.clear()
+        self.pathDict.clear()
+        if numNodes > 26:
+            ReportError("InitNodes", "Number of Nodes must be less than 26; Number given: {0}".format(numNodes))
+            raise NetworkError
+        tempList = NodeList[0:numNodes]
+        for node in tempList:
+            self.nodeDict[node] = {}
+            self.pathDict[node] = {}
+
+    # ------------------------ G e t / S e t ----------------------
+    def GetNodes(self):
+        nodes = []
+        for node in self.nodeDict:
+            nodes.append(node)
+        return ''.join(nodes)
+
+    def SetNodeLink(self, nodeSrc, nodeDst, cost):  # Tell the node it has a link to another node
+        self.nodeDict[nodeSrc][nodeDst] = cost
+
+    def SetNodePairLink(self, linkNodes, cost):     # Tell a pair of nodes they link with one another
+        self.SetNodeLink(linkNodes[0], linkNodes[1], cost)
+        self.SetNodeLink(linkNodes[1], linkNodes[0], cost)
+
+    def GetNodeLinks(self, node):
+        links = self.nodeDict[node]
+        if len(links) == 0:
+            print("ERROR: GetNodeLinks -> No Links on Node", node)
+        return links
+
+    # -------------------- C h e c k  V a l i d -------------------
+    def CheckValidNode(self, node):
+        for valid in self.nodeDict:     # Check each valid node in the listr
+            if node == valid:               # If any match with the node given, return true
+                return True
+        return False                        # Else return false
+
+    def CheckValidNodePair(self, node1, node2):
+        if (self.CheckValidNode(node1) and self.CheckValidNode(node2)): # If both valid
+            return True                                                     # Return True
+        return False                                                    # Else Return False
+
+    # -------------------------- P r i n t ------------------------
+    def PrintNodes(self):    # Print a formatted list of all nodes on the network and their info
+        print("Using Nodes:")
+        for node in self.nodeDict:
+            print(node, end="")
+        print("")   # Print final newline
+
+    def PrintNodeLinks(self):
+        for node in self.nodeDict:
+            self.nodeDict[node].PrintInfo()
+
+    # ========================================= L i n k   F u n c t i o n s =======================================
+    # --------------------------- I n i t -------------------------
+    def InitLinkList(self, linkList):
+        self.linkDict.clear()   # Clear any previously existing links
+        for link in linkList:
+            linkNodes = link[L_NodePrIndex]
+            linkLength = link[L_LengthIndex]
+            self.linkDict[linkNodes] = Link(linkNodes, linkLength)  # Create a Link object between nodes of a length
+            self.SetNodePairLink(linkNodes, linkLength)             # Update node objects to know their links
+
+    # def InitRandLinks(self):  # Initiate a list of links between nodes on the network from a list of tuples
+    #     self.linkDict.clear()   # Clear any previously existing links
+    #
+    #     for node in self.nodeList:
+    #         i = 0
+    #         numLinks = randint(1,4) # Create between 1 and 3 links for each
+    #
+    #         while(i < numLinks):
+    #             otherNode = self.nodeList[randint(0,NumNodes)]          # Get a random node from the list
+    #             linkNodes = FormatLinkName_List(node + otherNode)  # Get the formatted (ex: AB, not BA) link name
+    #
+    #             if(otherNode == node):  # If both nodes the same
+    #                 pass
+    #             elif(self.linkDict[linkNodes] != None):  # If the link already exists
+    #                 pass
+    #             else:                                                   # Otherwise
+    #                 linkLength = randint(LINK_RAND_MIN, LINK_RAND_MAX)
+    #                 self.linkDict[linkNodes] = Link(linkNodes, linkLength) # Append the link to the list
+
+    # -------------------------- P r i n t ------------------------
+    def PrintLinks(self):    # Print a formatted list of all links on the network and their info
+        print("With Links:")
+        for link in self.linkDict:      # Print each link in the link dictionary
+            self.linkDict[link].PrintInfo()
+
+    # ========================================= P a t h   F u n c t i o n s =======================================
+
+    def FindShortestPath(self, src, dst):
+        if (self.CheckValidNodePair(src, dst) == False):
+            print("ERROR: FindShortestPath -> Invalid Source Node,", src, "or Destination Node,", dst)
+            raise
+        pathAndCost = self.PathDefinedTo(src, dst) # Check if a path has been found before
+        pathCheck = pathAndCost[0]
+        costCheck = pathAndCost[1]
+        if pathCheck != None:    # If a path already exists to this node
+            return pathCheck, costCheck     # Return it, otherwise find one here
+        debugInfo   = False
+        costDict    = {}
+        solvedDict  = {}
+        curNode     = src
+        curPath     = src
+        curCost     = 0
+        pathFound   = False
+        # Set up default values for each connection
+        for node in self.nodeDict:
+            costDict[node] = [node, float("inf")]   # Mark node with default path and infinite cost
+            solvedDict[node] = False        # Mark each node as not solved
+        # Initialize first node connection values
+        costDict[src] = [src, 0]
+
+        while(pathFound == False):
+            curLeastCost = float("inf") # Reset 'least cost' to infinite
+            solvedDict[curNode] = True  # Mark current node as "solved" (This goes here b/c of initial loop)
+
+            if debugInfo:
+                print("curNode", curNode)
+            curLinksDict = self.GetNodeLinks(curNode)   # Get all connections to current node
+            for node in curLinksDict:
+                # If the combined cost of the current path and the link to a node is less than previously recorded path
+                if curCost + curLinksDict[node] < costDict[node][P_CostIndex] and solvedDict[node] == False:
+                    costDict[node] = [curPath + node, curLinksDict[node] + curCost]
+            for node in costDict:
+                if debugInfo:
+                    print("     node:", node)
+                    print("     costDict:", costDict)
+                    print("     costDict[node]:", costDict[node])
+                if costDict[node][P_CostIndex] < curLeastCost and solvedDict[node] == False:
+                    curLeastCost = costDict[node][P_CostIndex]
+                    curNode = node
+                    if debugInfo:
+                        print("     curLeastCost: Node", curNode, "with", curLeastCost)
+
+            curPath = costDict[curNode][P_PathIndex]
+            curCost = costDict[curNode][P_CostIndex]
+            for node in solvedDict:
+                if solvedDict[node] == False:   # If any nodes are not solved, mark pathFound false and break
+                    pathFound = False
+                    break
+                pathFound = True                # If loop allowed to fully complete, it marks the end of DSP
+        self.pathDict[src][dst] = costDict[dst][P_PathIndex], costDict[dst][P_CostIndex]
+#        self.nodeDict[src].SetPath(dst, costDict[dst][P_PathIndex], costDict[dst][P_CostIndex]) # Record the path to save time in future lookups
+        if debugInfo:
+            print("Path", costDict[dst][P_PathIndex], "of cost", costDict[dst][P_CostIndex], "from", src, "to", dst)
+        returnPath = costDict[dst][P_PathIndex]
+        returnCost = costDict[dst][P_CostIndex]
+        return costDict[dst]
+
+    def PathDefinedTo(self, src, dst):
+        try:
+            if dst in self.pathDict[src]:
+                path, cost = self.pathDict[src][dst]
+                return path, cost
+            else:
+                return None, None
+        except:
+            print(src, dst)
+            print(self.pathDict[src])
+            raise
+    def VerifyPath(self, linkPath): # Verify that the listed path exists between links on the network
+        i = 0
+        pathLen = len(linkPath)
+        while (i != pathLen - 1):   # Iterate through the charaacters in the path string
+            if (self.linkDict.get(linkPath[i] + linkPath[i + 1]) is None):  # If a direct link between nodes in path DNE
+                print("ERROR: VerifyPath -> with link:", linkPath[i] + linkPath[i+1])
+                return False    #report an error and return false
+            i += 1
+        return True     # If all links present in correct direction, return true
+
+    # ====================== B a n d w i t h   R e s e r v a t i o n   F u n c t i o n s =========================
+    # ---------------- G e n e r a t e   R e s e r v a t i o n s -------------------
+
+    # Generate a reservation with random values
+    def CreateRes(self, my_lambda, nodes, resNum):
+        res = Reservation(my_lambda, nodes, resNum)
+        src, dst = res.GetSrcDst()  # Get the source and destination nodes for the reservation
+        path, cost = self.FindShortestPath(src, dst)    # Find the shortest src/dst path, and the cost of that path
+        res.SetPath(path)  # Set the shortest path for that reservation
+        blocked = res.SetNumSlots(cost)   # Set the number of slots the reservation will take
+        if res.num_slots == None:
+            raise
+        if blocked:
+            self.immediateBlocking += 1
+            print("M = 0?")
+        else:
+            self.initialResList.append(res)
+
+    # Generate several reservations with random values
+    def CreateMultRes(self, my_lambda, numRes):
+        i = 0
+        nodes = self.GetNodes()
+        while i < numRes:
+            self.CreateRes(my_lambda, nodes, i)
+            i += 1
+        self.SortInitResByArrivalT()
+
+    # Sort res in arrivingResList by their start time
+    def SortInitResByArrivalT(self):
+        self.initialResList.sort(key=lambda res: (res.arrival_t, res.resNum))
+
+    # Sort res in arrivingResList by their start time
+    def SortArrivingResByStartT(self):
+        self.arrivingResList.sort(key=lambda res: (res.start_t, res.arrival_t, res.resNum))
+
+    # Print out arrivingResList
+    def PrintArrivingResList(self):
+        for res in self.arrivingResList:
+            print(
+                "Reservation arriving at {0:1d}, Bookahead for {1:3d}; Start time at {2:2d} and size of {3:2d}".format(
+                    res.arrival_t, res.book_t, res.start_t, res.num_slots))
+
+    # ------------------ H a n d l e   R e s e r v a t i o n s ---------------------
+    #def FwdResToLink(self, res, link):
+    def DEBUG_PrintTypesInList(self, list):
+        for obj in list:
+            print("Object type", type(obj))
+
+    def DEBUG_PrintListOfRes(self, resList):
+        for res in resList:
+            print("Reservation from", res.GetSrcDst(), "with next path", res.GetNextPathLink(), "Arriving at", res.GetNextTime(), "for", res.GetHoldingTime(), "of width", res.GetNumSlots())
+
+    def DEBUG_ERROR_CheckValidRes(self, resList): # ensure all objects in list are of type reservation
+        for res in resList:
+            if type(res) != Reservation:
+                return False
+        return True
+
+    # For use upon reservations initial arrival at first node. Checks if a continuous space is open on its path right now.
+    #   Returns the first index found. Blocks if none.
+    def CheckInitialPathOpen(self, res):
+        listLinks       = []  # List of links in path to check
+        spaceOptions    = []  # Options for continuous blocks of space to check in path
+        pathSpace       = None # The final decided continuous (persistent) start location for the reservation
+        hasPath         = False
+
+        size            = res.GetNumSlots() # get the size in slots of the request
+        listLinks       = res.GetPath()
+        spacesFound, spaceOptions    = self.linkDict[listLinks[0]].GetListOfOpenSpaces(size) # Possible cont. spaces in init. link
+
+        if spacesFound == False:    # If no spaces are found
+            return False, pathSpace
+        elif len(listLinks) == 1:  # If only one link in path
+            return True, spaceOptions[0]    # Return that a path was found, and the first spot found
+        for space in spaceOptions:  # For each possible space
+            pathSpace = space
+            for link in listLinks[1:]:  # For each link beyond the first in the path
+                if self.linkDict[link].CheckContinuousSpace(space, size) == FULL:   # Check each possible space
+                    hasPath = False
+                    break                   # If the space is full in any link, move on to the next possible space
+                else:
+                    hasPath = True
+
+            if hasPath == True:         # If any possible space is empty on every link
+                return hasPath, pathSpace   # return True and the index of the space
+
+        pathSpace = None    # set pathSapce as None
+        if hasPath: # If hasPath is somehow True at this point, raise an error
+            print("Oops, I did something wrong")
+            raise
+
+        return hasPath, pathSpace
+
+    def AllocateAcrossLinks(self, startIndex, res):
+        startT      = res.GetStartT()
+        size        = res.GetNumSlots()
+        holdingT    = res.GetHoldingTime()
+        links       = res.GetPath()
+
+        for link in links:
+            self.linkDict[link].PlaceRes(startIndex, size, holdingT, startT)
+
+
+    # ======================================= M a i n   F u n c t i o n ==========================================
+
+    def MainFunction(self, my_lambda, numRes, info = False):
+        # Reservations cannot be deleted in the middle of a list search, so their indexes are saved to be deleted after
+        arrivedOrIBlocked_Index     = []
+        completeOrPBlocked_Index    = []
+
+        self.CreateMultRes(my_lambda, numRes)
+        self.SortInitResByArrivalT()
+        for time in range(0, TIME_WNDW_SIZE):
+
+            newResArrived   =   False   # Each time, t, set newResArrived to false; check if need to re-sort arrivedResList
+            arrivedOrIBlocked_Index.clear()
+
+            for res in self.initialResList:
+                if res.arrival_t == time:   # If the Res arrives at this time
+                    hasPath, pathSpace = self.CheckInitialPathOpen(res) # Check to see if there is an opening
+                    if hasPath:
+                        self.arrivingResList.append(res)
+                        arrivedOrIBlocked_Index.append(self.initialResList.index(res)) # Queue the res for deletion
+                        newResArrived = True    # Set to true if any new res arrive
+                    else:
+                        self.immediateBlocking += 1
+                        arrivedOrIBlocked_Index.append(self.initialResList.index(res)) # Queue the res for deletion
+                else:
+                    break   # As the lsit is ordered by time: if any do not match, move on to the next step; Checking arrived res
+
+            # Clear out res that arrive or immediately block
+            arrivedOrIBlocked_Index.sort(reverse=True) # Sort indexes from low to high as deleting reindexes later entries
+            for index in arrivedOrIBlocked_Index:
+                self.initialResList.pop(index)
+
+            completeOrPBlocked_Index.clear()
+            if newResArrived:   # If any new reservations have arrived
+                self.SortArrivingResByStartT()  # Sort arriving res list if new res have arrived
+            for res in self.arrivingResList:
+                if res.GetStartT() == time:
+                    hasPath, pathSpace = self.CheckInitialPathOpen(res)  # Check to see if there is an opening
+                    if hasPath:
+                        self.AllocateAcrossLinks(pathSpace, res)
+                        completeOrPBlocked_Index.append(self.arrivingResList.index(res))
+                        self.completedRes += 1
+                    else:
+                        self.promisedBlocking += 1
+                        completeOrPBlocked_Index.append(self.arrivingResList.index(res))
+                else:
+                    break   # As the lsit is ordered by time: if any do not match, move on to the next step
+
+            # Clear out res that complete or promise block
+            completeOrPBlocked_Index.sort(reverse=True)  # Sort indexes from low to high as deleting reindexes later entries
+            for index in completeOrPBlocked_Index:
+                self.arrivingResList.pop(index)
+
+        localBlocking = self.immediateBlocking  # Get number of local blocks
+        linkBlocking = self.promisedBlocking
+        totalBlocking = localBlocking + linkBlocking
+
+        if info:    # If printout of results wanted immediately
+            print("Of", numRes, "initial reservations")
+            print("Reservations Completed", self.completedRes)
+            print("Total number of blocks:", totalBlocking, "\n", localBlocking, "blocked initially and", linkBlocking, "due to conflict")
+
+        if(numRes != totalBlocking + self.completedRes):
+            ReportError("MainFunction", "Not all of {0} reservations blocked: {1}, or completed: {2}".format(numRes, totalBlocking, self.completedRes))
+            raise NetworkError
+
+        return(self.completedRes, localBlocking, linkBlocking, totalBlocking)
+
+
+
+class NetworkError(Exception):
+    pass
+
+def ReportError(funct, msg, info = None):
+    print("========== ERROR:", funct, "->", msg)
+    if info != None:
+        for line in info:
+            print("=====", line)
+
+def DEBUG_print(msg):
+    print(msg)
+
+test = Network(NumNodes, LinkList)
+test.MainFunction(Lambda, NumRes, info = True)
+#
+# completeVsBlockRatios = []
+#
+# initLambda = 2.3
+# deltaLambda = 0.2
+#
+# for x in range(23,97,2):
+#
+#     avgComplete = 0
+#     avgImmediateBlock = 0
+#     avgPromisedBlock = 0
+#     avgTotalBlock = 0
+#     detailed = False
+#
+#     myLambda = x/10
+#     for y in range(0,NumTrials):
+#         test = Network(NumNodes, LinkList)
+#         results = test.MainFunction(myLambda, NumRes)
+#         avgComplete         += results[0]
+#         avgImmediateBlock   += results[1]
+#         avgPromisedBlock    += results[2]
+#         avgTotalBlock       += results[3]
+#
+#     avgComplete         = ceil(avgComplete / NumTrials)
+#     avgImmediateBlock   = ceil(avgImmediateBlock / NumTrials)
+#     avgPromisedBlock    = ceil(avgPromisedBlock / NumTrials)
+#     avgTotalBlock       = ceil(avgTotalBlock / NumTrials)
+#     print("For Lambda {:3.2f}".format(myLambda))
+#     if detailed:
+#         print("Averages: Number Complete-", avgComplete, "\nTotal Blocked-", avgTotalBlock, "with:\n Immediate Blocked-", avgImmediateBlock, "and\n Promised Block", avgPromisedBlock)
+#     if avgTotalBlock == 0:
+#         avgTotalBlock = 1
+#     print("Percentage Complete: {:10.8f}".format(avgComplete/avgTotalBlock))
+#     completeVsBlockRatios.append(avgComplete/avgTotalBlock)
+#
+# testResults = open("TestResults.txt", 'w')
+# for test in completeVsBlockRatios:
+#     testResults.write("{:10.8f}\n".format(test))

@@ -1,5 +1,5 @@
 MAX_NUM_FREQ    = 128
-TIME_WNDW_SIZE  = 320       # Maximum theoretical holding time is around 320
+TIME_WNDW_SIZE  = 1500       # Maximum theoretical holding time is around 320
 MAX_SLOT_SIZE   = 12.5
 
 
