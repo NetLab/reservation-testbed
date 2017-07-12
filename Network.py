@@ -30,7 +30,8 @@ class Network:
     def InitNodes(self, numNodes):      # Initiate a list of nodes on the network from a list of tuples
         self.nodeDict.clear()
         if numNodes > 26:
-            print("ERROR: InitNodes -> Number of Nodes must be less than 26; Number given:", numNodes)
+            ReportError("InitNodes", "Number of Nodes must be less than 26; Number given: {0}".format(numNodes))
+            raise NetworkError
         tempList = NodeList[0:numNodes]
         for node in tempList:
             self.nodeDict[node] = Node(node)
@@ -120,10 +121,11 @@ class Network:
         if (self.CheckValidNodePair(src, dst) == False):
             print("ERROR: FindShortestPath -> Invalid Source Node,", src, "or Destination Node,", dst)
             raise
-        path = self.PathDefinedTo(src, dst) # Check if a path has been found before
-        if path != None:    # If a path already exists to this node
-            return path     # Return it, otherwise find one here
-
+        pathAndCost = self.PathDefinedTo(src, dst) # Check if a path has been found before
+        pathCheck = pathAndCost[0]
+        costCheck = pathAndCost[1]
+        if pathCheck != None:    # If a path already exists to this node
+            return pathCheck, costCheck     # Return it, otherwise find one here
         debugInfo   = False
         costDict    = {}
         solvedDict  = {}
@@ -167,10 +169,12 @@ class Network:
                     pathFound = False
                     break
                 pathFound = True                # If loop allowed to fully complete, it marks the end of DSP
-        self.nodeDict[src].SetPath(dst, costDict[dst][P_PathIndex]) # Record the path to save time in future lookups
+        self.nodeDict[src].SetPath(dst, costDict[dst][P_PathIndex], costDict[dst][P_CostIndex]) # Record the path to save time in future lookups
         if debugInfo:
             print("Path", costDict[dst][P_PathIndex], "of cost", costDict[dst][P_CostIndex], "from", src, "to", dst)
-        return costDict[dst][P_PathIndex]
+        returnPath = costDict[dst][P_PathIndex]
+        returnCost = costDict[dst][P_CostIndex]
+        return costDict[dst]
 
     def PathDefinedTo(self, src, dst):
         return self.nodeDict[src].CheckPaths(dst)
@@ -206,8 +210,16 @@ class Network:
     def CreateRes(self, my_lambda, nodes):
         res = Reservation(my_lambda, nodes)
         src, dst = res.GetSrcDst()  # Get the source and destination nodes for the reservation
-        res.SetPath(self.FindShortestPath(src, dst))  # Find and set the shortest path it can take
-        self.arrivingResList.append(res)
+        path, cost = self.FindShortestPath(src, dst)    # Find the shortest src/dst path, and the cost of that path
+        res.SetPath(path)  # Set the shortest path for that reservation
+        blocked = res.SetNumSlots(cost)   # Set the number of slots the reservation will take
+        if res.num_slots == None:
+            raise
+        if blocked:
+            self.immediateBlocking += 1
+            print("M = 0?")
+        else:
+            self.arrivingResList.append(res)
 
     # Generate several reservations with random values
     def CreateMultRes(self, my_lambda, numRes):
@@ -345,6 +357,9 @@ class Network:
                         resInstr[i] = BLK_INSTR     # Record res as blocked
                         continue                        # continue to next res in arrivingRes
                     elif res.start_t == self.time + 1:  # Only give the res an index if it is about to start
+                        if res.GetLinkIndex() != None:
+                            print("ERROR-> UpdateLinkRes Reservation was reindexed (Immediate Start)")
+                            raise
                         res.SetLinkIndex(slot)     # Set the slot index that the res will continuously occupy
 
                 for link in self.linkDict:  # For each link
@@ -359,6 +374,9 @@ class Network:
             for res in slottableRes:
                 hasSpace, slot = self.CheckInitialPathOpen(res)
                 if hasSpace:
+                    if res.GetLinkIndex() != None:
+                        print("ERROR-> UpdateLinkRes Reservation was reindexed (Delayed Start)")
+                        raise
                     res.SetLinkIndex(slot)
                     slottedRes.append(res)
                 else:
@@ -388,7 +406,7 @@ class Network:
 
     # ======================================= M a i n   F u n c t i o n ==========================================
 
-    def MainFunction(self, my_lambda, numRes):
+    def MainFunction(self, my_lambda, numRes, info = False):
         self.CreateMultRes(my_lambda, numRes)
         self.initialResList = deepcopy(self.arrivingResList)
 
@@ -406,7 +424,7 @@ class Network:
                     errInfo.append("Reservation {0} with next link {1} arriving at {2}".format(res.GetSrcDst(), res.GetNextPathLink(), res.GetNextTime()))
 
                 ReportError("MainFunction", errMsg, info=errInfo)
-                #raise NetworkError
+                raise NetworkError
 
         if len(self.arrivingResList) > 0:
             errMsg = "Reservations never addressed:"
@@ -415,20 +433,28 @@ class Network:
                 errInfo.append(
                     "Reservation {0} with next link {1} arriving at {2}".format(res.GetSrcDst(), res.GetNextPathLink(), res.GetNextTime()))
             ReportError("MainFuction", errMsg, info = errInfo)
-            raise NetworkError
+            if res.GetNextPathLink[1] == TERMINATE_CHAR:
+                print("Reservation not finished? Look into this incredibly rare bug")
+                self.completedRes += 1
+            else:
+                raise NetworkError
 
-        print("Of", numRes, "initial reservations")
-        print("Reservations Completed", self.completedRes)
-        localBlocking   = self.immediateBlocking    # Get number of local blocks
-        linkBlocking    = self.promisedBlocking
+        localBlocking = self.immediateBlocking  # Get number of local blocks
+        linkBlocking = self.promisedBlocking
         for link in self.linkDict:
             linkBlocking += self.linkDict[link].GetNumBlocks()  # Add the number of blocks occurring in each link
         totalBlocking = localBlocking + linkBlocking
-        print("Total number of blocks:", totalBlocking, "\n", localBlocking, "blocked initially and", linkBlocking, "due to conflict")
+
+        if info:    # If printout of results wanted immediately
+            print("Of", numRes, "initial reservations")
+            print("Reservations Completed", self.completedRes)
+            print("Total number of blocks:", totalBlocking, "\n", localBlocking, "blocked initially and", linkBlocking, "due to conflict")
 
         if(numRes != totalBlocking + self.completedRes):
             ReportError("MainFunction", "Not all of {0} reservations blocked: {1}, or completed: {2}".format(numRes, totalBlocking, self.completedRes))
             raise NetworkError
+
+        return(self.completedRes, localBlocking, linkBlocking, totalBlocking)
 
 
 
@@ -444,9 +470,43 @@ def ReportError(funct, msg, info = None):
 def DEBUG_print(msg):
     print(msg)
 
-test = Network(NumNodes, LinkList)
-#test.PrintNodes()
-#test.PrintLinks()
-#test.PrintNodeLinks()
-#print(test.FindShortestPath("M","C"))
-test.MainFunction(Lambda, NumRes)
+#test = Network(NumNodes, LinkList)
+#test.MainFunction(Lambda, NumRes, info = True)
+
+completeVsBlockRatios = []
+
+initLambda = 2.3
+deltaLambda = 0.2
+
+for x in range(23,97,2):
+
+    avgComplete = 0
+    avgImmediateBlock = 0
+    avgPromisedBlock = 0
+    avgTotalBlock = 0
+    detailed = False
+
+    myLambda = x/10
+    for y in range(0,NumTrials):
+        test = Network(NumNodes, LinkList)
+        results = test.MainFunction(myLambda, NumRes)
+        avgComplete         += results[0]
+        avgImmediateBlock   += results[1]
+        avgPromisedBlock    += results[2]
+        avgTotalBlock       += results[3]
+
+    avgComplete         = ceil(avgComplete / NumTrials)
+    avgImmediateBlock   = ceil(avgImmediateBlock / NumTrials)
+    avgPromisedBlock    = ceil(avgPromisedBlock / NumTrials)
+    avgTotalBlock       = ceil(avgTotalBlock / NumTrials)
+    print("For Lambda {:3.2f}".format(myLambda))
+    if detailed:
+        print("Averages: Number Complete-", avgComplete, "\nTotal Blocked-", avgTotalBlock, "with:\n Immediate Blocked-", avgImmediateBlock, "and\n Promised Block", avgPromisedBlock)
+    if avgTotalBlock == 0:
+        avgTotalBlock = 1
+    print("Percentage Complete: {:10.8f}".format(avgComplete/avgTotalBlock))
+    completeVsBlockRatios.append(avgComplete/avgTotalBlock)
+
+testResults = open("TestResults.txt", 'w')
+for test in completeVsBlockRatios:
+    testResults.write("{:10.8f}\n".format(test))

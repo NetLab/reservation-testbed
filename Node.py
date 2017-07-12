@@ -20,20 +20,15 @@ class Node:
     def GetLinks(self):
         return self.linkDict
 
-    def SetPath(self, dst, path):
-        self.pathDict[dst] = path
-
-    def GetPaths(self):
-        paths = []
-        for path in self.pathDict:
-            paths.append(self.pathDict[path])
-        return paths
+    def SetPath(self, dst, path, cost):
+        self.pathDict[dst] = [path, cost]
 
     def CheckPaths(self, dst):
         if dst in self.pathDict:
-            return self.pathDict[dst]
+            pathCost = self.pathDict[dst].copy()
+            return pathCost
         else:
-            return None
+            return None, None
 
     def PrintInfo(self):
         print("On Node", self.name, ":")

@@ -21,7 +21,15 @@ class Reservation:
         self.holding_t      = self.GenHoldingTime()
         self.start_t        = self.arrival_t + self.book_t
         self.size_req       = self.GenSizeRequest()
-        self.num_slots      = self.GenNumberSlots(self.size_req)
+        self.num_slots      = None
+
+    def SetNumSlots(self, cost):
+        blocked, num_slots = self.GenNumberSlots(cost)
+        if blocked:
+            return True
+        else:
+            self.num_slots = num_slots
+            return False
 
     # Used for overloading randomly generated reservations (load in specific attributes for a reservation)
     def Load(self, nodes, arrival_t, start_t, holding_t, num_slots):
@@ -96,6 +104,8 @@ class Reservation:
     def SetLinkIndex(self, linkIndex):
         self.linkIndex = linkIndex
 
+    # =========================== G e n e r a t i o n ==============================
+
     # --------------------------------- T i m e ------------------------------------
     def SetNextTime(self, nextTime):    # Sets time for link to next immediately start. Used for telling
         self.arrival_t  = nextTime      # res arrives at next link after it completes current step
@@ -124,13 +134,25 @@ class Reservation:
 
     def GenSizeRequest(self):
         #seed()
-        return 200 - (randint(1,16) * 12.5)
+        return 200 - (randint(1,16) * MAX_SLOT_SIZE)
 
     def GetNumSlots(self):
         return self.num_slots
 
-    def GenNumberSlots(self, size_req):
-        return ceil((size_req/12.5) + guard_band)
+    def GenNumberSlots(self, dist):
+        if dist <= 5000 and dist > 2500:
+            M = 1
+        elif dist <= 2500 and dist > 1250:
+            M = 2
+        elif dist <= 1250 and dist > 625:
+            M = 3
+        elif dist <= 625:
+            M = 4
+        else:
+            M = 0
+            return True, None
+
+        return False, ceil((self.size_req/(MAX_SLOT_SIZE * M)) + guard_band)
 
 #Theoretical Maximums with lambda 1:
 # Arrival = 15
