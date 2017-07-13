@@ -1,6 +1,7 @@
 from LinkV2 import *
 from copy import deepcopy
 from time import *
+from threading import *
 
 # Routing and Network Assignment
 
@@ -26,6 +27,15 @@ class Network:
 
         self.InitNodes(numNodes)
         self.InitLinkList(linkVals)
+
+        self.D_Avg_1 = 0
+        self.D_Num_1 = 0
+        self.D_Avg_2 = 0
+        self.D_Num_2 = 0
+        self.D_Avg_3 = 0
+        self.D_Num_3 = 0
+        self.D_Avg_4 = 0
+        self.D_Num_5 = 0
 
     # ========================================= N o d e   F u n c t i o n s =======================================
     # --------------------------- I n i t -------------------------
@@ -269,7 +279,17 @@ class Network:
 
         size            = res.GetNumSlots() # get the size in slots of the request
         listLinks       = res.GetPath()
-        spacesFound, spaceOptions    = self.linkDict[listLinks[0]].GetListOfOpenSpaces(size) # Possible cont. spaces in init. link
+        startT          = res.GetStartT()
+
+        self.D_Num_2 += 1
+        D_Time_2 = clock()
+        spaceOptions    = self.linkDict[listLinks[0]].GetListOfOpenSpaces(size, startT) # Possible cont. spaces in init. link
+        if len(spaceOptions) > 0:
+            spacesFound = True
+        else:
+            spacesFound = False
+        D_Time_2 = clock() - D_Time_2
+        self.D_Avg_2 += D_Time_2
 
         if spacesFound == False:    # If no spaces are found
             return False, pathSpace
@@ -278,7 +298,12 @@ class Network:
         for space in spaceOptions:  # For each possible space
             pathSpace = space
             for link in listLinks[1:]:  # For each link beyond the first in the path
-                if self.linkDict[link].CheckContinuousSpace(space, size) == FULL:   # Check each possible space
+                self.D_Num_1 += 1
+                D_Time_1 = clock()
+                isFull = self.linkDict[link].CheckContinuousSpace(space, size)  # Check each possible space
+                D_Time_1 = clock() - D_Time_1
+                self.D_Avg_1 += D_Time_1
+                if isFull == FULL:
                     hasPath = False
                     break                   # If the space is full in any link, move on to the next possible space
                 else:
@@ -327,15 +352,6 @@ class Network:
 
         self.CreateMultRes(my_lambda, numRes)
         self.SortInitResByArrivalT()
-
-        smallCheck = clock()
-        i = 0
-        for res in self.initialResList:
-            if res.arrival_t == 5000:
-                i += 1
-        smallCheck = clock() - smallCheck
-        print("Small Check", smallCheck)
-
 
         for time in range(0, TIME_WNDW_SIZE):
 
@@ -430,13 +446,15 @@ class Network:
             raise NetworkError
         DEBUG_Total_Time = clock() - DEBUG_Total_Time
 
-        if(True):
+        if(False):
             print("DEBUG_CIPO1 Average", DEBUG_CIPO1_Avg/DEBUG_CIPO1_Num, "Total", DEBUG_CIPO1_Avg)
             print("DEBUG_Check Average", DEBUG_Check_Avg/DEBUG_Check_Num, "Total", DEBUG_Check_Avg)
             print("DEBUG_Init Average", DEBUG_Init_Avg / DEBUG_Init_Num, "Total", DEBUG_Init_Avg)
             print("DEBUG_Arri Average", DEBUG_Arri_Avg / DEBUG_Arri_Num, "Total", DEBUG_Arri_Avg)
             print("DEBUG_HasPath Average", DEBUG_HasP_Avg / DEBUG_HasP_Num, "Total", DEBUG_HasP_Avg)
             print("DEBUG_HasNoPath Average", DEBUG_NoP_Avg / DEBUG_NoP_Num, "Total", DEBUG_NoP_Avg)
+            print("DEBUG Continuous Open", self.D_Avg_1/ self.D_Num_1, "Total", self.D_Avg_1)
+            print("DEBUG Get List of Open", self.D_Avg_2/ self.D_Num_2, "Total", self.D_Avg_2)
             print("Total Time", DEBUG_Total_Time)
 #        return(self.completedRes, localBlocking, linkBlocking, totalBlocking)
         return DEBUG_Total_Time
@@ -454,17 +472,26 @@ def ReportError(funct, msg, info = None):
 def DEBUG_print(msg):
     print(msg)
 
+
+def RunTrial(myLambda):
+    avgTotal = 0
+    for x in range(NumTrials):
+        test = Network(NumNodes, LinkList)
+        total = test.MainFunction(myLambda, NumRes, info=False)
+        avgTotal += total
+    print("total time for lambda", myLambda, "was", avgTotal / NumTrials, "seconds")
+
 #test = Network(NumNodes, LinkList)
 #total = test.MainFunction(Lambda, NumRes, info = True)
 
-avgTotal = 0
-for x in range(0,1):
-    test = Network(NumNodes, LinkList)
-    total = test.MainFunction(Lambda, NumRes, info=True)
-    avgTotal += total
-print("total", avgTotal/10)
+threadTests = []
+for x in range(1,6):
+    threadTests.append(Thread(None, target=RunTrial, args=[x,]))
+for x in range(0,5):
+    threadTests[x].start()
+for x in range(0,5):
+    threadTests[x].join()
 
-    #
 # completeVsBlockRatios = []
 #
 # initLambda = 2.3

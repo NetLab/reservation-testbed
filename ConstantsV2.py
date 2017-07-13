@@ -5,7 +5,7 @@ MAX_SLOT_SIZE   = 12.5
 
 NumNodes        = 14
 NumRes          = 50000
-NumTrials       = 40
+NumTrials       = 1
 
 guard_band  = 1
 Lambda      = 1

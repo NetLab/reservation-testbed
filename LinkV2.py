@@ -5,6 +5,7 @@ from copy import deepcopy
 class Link:
     def __init__(self, nodes, length):
         self.timeWindow     = [[EMPTY] * MAX_NUM_FREQ] * TIME_WNDW_SIZE ## Declare 2D array of Empty (False) time periods and frequencies
+        self.availSlots     = [MAX_NUM_FREQ] * TIME_WNDW_SIZE   # Number to track available slots in time row
         self.nodes          = nodes
         self.length         = length
         self.onFirstLink    = True
@@ -50,14 +51,16 @@ class Link:
             i += 1      # Increment the index
         return False, startSlot    # If no suitable space is found, return False and None
 
-    # DECIPROCATED_DECIPROCATED_DECIPROCATED_DECIPROCATED_DECIPROCATED_DECIPROCATED
-    def GetListOfOpenSpaces(self, size):
+    def GetListOfOpenSpaces(self, size, startT):
         listOfSpaces    = []    # List of spaces of size(size) in the current link
         avail           = 0
         i               = 0
         startSlot       = None
 
-        for space in self.timeWindow[0]:    # For each space in the current row
+        #if self.availSlots[startT] < size:  # If not enough slots for space to exist
+        #    return listOfSpaces # return the empty list instantly
+
+        for space in self.timeWindow[startT]:    # For each space in the current row
             if space == EMPTY:  # If space is empty
                 if avail == 0:      # If start of new space to be checked
                     startSlot = i       # Record the start slot of the space
@@ -74,18 +77,19 @@ class Link:
                 listOfSpaces.append(startSlot + (avail - size))    # append the index of the open space (first or subsequent)
             i += 1      # Increment the index
 
-        if len(listOfSpaces) <= 0:  # If no available spaces of size(size)
-            return False, listOfSpaces  # Return false
-        else:
-            return True, listOfSpaces   # If at least one suitable space is found, return true and the list of suitable spaces
+        return listOfSpaces   # If at least one suitable space is found, return true and the list of suitable spaces
 
     def PlaceRes(self, startSlot, size, depth, startDepth):
         i = 0
-        j = startDepth
+        j = 0
+
+        for k in range(0, depth):
+            self.availSlots[startDepth + k] -= size # Mark the time row as having less space
+
         while(i < size):
             while(j < depth):
                 try:
-                    self.timeWindow[j][startSlot + i] = FULL
+                    self.timeWindow[startDepth + j][startSlot + i] = FULL
                 except:
                     print("Size", size)
                     print("Depth", depth)
