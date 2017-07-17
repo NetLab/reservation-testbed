@@ -1,5 +1,4 @@
 import random
-random.seed(a=1)
 from LinkV2 import *
 from copy import deepcopy
 from time import *
@@ -459,7 +458,7 @@ class Network:
             print("DEBUG Get List of Open", self.D_Avg_2/ self.D_Num_2, "Total", self.D_Avg_2)
             print("Total Time", DEBUG_Total_Time)
 #        return(self.completedRes, localBlocking, linkBlocking, totalBlocking)
-        return DEBUG_Total_Time
+        return self.completedRes, localBlocking, linkBlocking, DEBUG_Total_Time
 
 
 class NetworkError(Exception):
@@ -474,17 +473,35 @@ def ReportError(funct, msg, info = None):
 def DEBUG_print(msg):
     print(msg)
 
+def ReportResults(indexLambda, avgComp, avgImme, avgProm):
+    report = open("Test"+ str(indexLambda) +".txt", 'w')
+    report.write("Test for Lambda " + str(LambdaList[indexLambda]))
+    report.write("\nComplete Vs Blocked Ratio " + str(avgComp/(avgImme + avgProm)) +'\n\n')
+#    report.write(str(LambdaList[indexLambda]) + ' ' + str(avgComp) + ' ' + str(avgImme) + ' ' + str(avgProm))
+    report.close()
 
 def RunTrial(indexLambda, detailed=True):
-    avgTotal = 0
+    avgTime = 0
+    avgComp = 0
+    avgImme = 0
+    avgProm = 0
+
     myLambda = LambdaList[indexLambda]
     for x in range(NumTrials):
         test = Network(NumNodes, LinkList)
-        total = test.MainFunction(myLambda, NumRes, info=False)
-        avgTotal += total
+        complete, immediate, promised, time = test.MainFunction(myLambda, NumRes, info=False)
+        avgTime += time
+        avgComp += complete
+        avgImme += immediate
+        avgProm += promised
+    avgTime = avgTime / NumTrials
+    avgComp = avgComp / NumTrials
+    avgImme = avgImme / NumTrials
+    avgProm = avgProm / NumTrials
+
     if detailed:
-        print("total time for lambda", myLambda, "was", avgTotal, "with an average of", avgTotal / NumTrials, "seconds")
-    return [myLambda, avgTotal/NumTrials]
+        print("total time for lambda", myLambda, "was", avgTime, "with an average of", avgTime / NumTrials, "seconds")
+    ReportResults(indexLambda, avgComp, avgImme, avgProm)
 
 if __name__ == '__main__':
-    RunTrial(2.3, detailed=True)
+    RunTrial(1, detailed=True)

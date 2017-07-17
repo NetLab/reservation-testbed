@@ -5,7 +5,8 @@ MAX_SLOT_SIZE   = 12.5
 
 NumNodes        = 14
 NumRes          = 50000
-NumTrials       = 1
+NumTrials       = 40
+NumLambdas      = 4
 
 guard_band  = 1
 Lambda      = 1
@@ -24,8 +25,6 @@ LambdaList = [
     8.1, 8.3, 8.5, 8.7, 8.9,
     9.1, 9.3, 9.5, 9.7
 ]
-
-NumLambdas = 4
 
 NodeList        = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 LinkList        = [
