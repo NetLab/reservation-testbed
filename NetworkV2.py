@@ -1,7 +1,9 @@
+import random
+random.seed(a=1)
 from LinkV2 import *
 from copy import deepcopy
 from time import *
-from threading import *
+from argparse import *
 
 # Routing and Network Assignment
 
@@ -473,59 +475,16 @@ def DEBUG_print(msg):
     print(msg)
 
 
-def RunTrial(myLambda):
+def RunTrial(indexLambda, detailed=True):
     avgTotal = 0
+    myLambda = LambdaList[indexLambda]
     for x in range(NumTrials):
         test = Network(NumNodes, LinkList)
         total = test.MainFunction(myLambda, NumRes, info=False)
         avgTotal += total
-    print("total time for lambda", myLambda, "was", avgTotal / NumTrials, "seconds")
+    if detailed:
+        print("total time for lambda", myLambda, "was", avgTotal, "with an average of", avgTotal / NumTrials, "seconds")
+    return [myLambda, avgTotal/NumTrials]
 
-#test = Network(NumNodes, LinkList)
-#total = test.MainFunction(Lambda, NumRes, info = True)
-
-threadTests = []
-for x in range(1,6):
-    threadTests.append(Thread(None, target=RunTrial, args=[x,]))
-for x in range(0,5):
-    threadTests[x].start()
-for x in range(0,5):
-    threadTests[x].join()
-
-# completeVsBlockRatios = []
-#
-# initLambda = 2.3
-# deltaLambda = 0.2
-#
-# for x in range(23,97,2):
-#
-#     avgComplete = 0
-#     avgImmediateBlock = 0
-#     avgPromisedBlock = 0
-#     avgTotalBlock = 0
-#     detailed = False
-#
-#     myLambda = x/10
-#     for y in range(0,NumTrials):
-#         test = Network(NumNodes, LinkList)
-#         results = test.MainFunction(myLambda, NumRes)
-#         avgComplete         += results[0]
-#         avgImmediateBlock   += results[1]
-#         avgPromisedBlock    += results[2]
-#         avgTotalBlock       += results[3]
-#
-#     avgComplete         = ceil(avgComplete / NumTrials)
-#     avgImmediateBlock   = ceil(avgImmediateBlock / NumTrials)
-#     avgPromisedBlock    = ceil(avgPromisedBlock / NumTrials)
-#     avgTotalBlock       = ceil(avgTotalBlock / NumTrials)
-#     print("For Lambda {:3.2f}".format(myLambda))
-#     if detailed:
-#         print("Averages: Number Complete-", avgComplete, "\nTotal Blocked-", avgTotalBlock, "with:\n Immediate Blocked-", avgImmediateBlock, "and\n Promised Block", avgPromisedBlock)
-#     if avgTotalBlock == 0:
-#         avgTotalBlock = 1
-#     print("Percentage Complete: {:10.8f}".format(avgComplete/avgTotalBlock))
-#     completeVsBlockRatios.append(avgComplete/avgTotalBlock)
-#
-# testResults = open("TestResults.txt", 'w')
-# for test in completeVsBlockRatios:
-#     testResults.write("{:10.8f}\n".format(test))
+if __name__ == '__main__':
+    RunTrial(2.3, detailed=True)

@@ -1,4 +1,5 @@
 from operator import attrgetter
+from random import *
 from ReservationV2 import *
 from copy import deepcopy
 
@@ -83,8 +84,8 @@ class Link:
         i = 0
         j = 0
 
-        for k in range(0, depth):
-            self.availSlots[startDepth + k] -= size # Mark the time row as having less space
+#        for k in range(0, depth):
+#            self.availSlots[startDepth + k] -= size # Mark the time row as having less space
 
         while(i < size):
             while(j < depth):

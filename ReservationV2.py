@@ -1,15 +1,15 @@
-from random import *
+import random
 from time import sleep
 from math import floor, ceil, log
 from ConstantsV2 import *
 
 class Reservation:
     def __init__(self, my_lambda, nodes, resNum):
-        self.sourceNode = nodes[randint(0,len(nodes) - 1)]  # Randomly assign source node from list
+        self.sourceNode = nodes[random.randint(0,len(nodes) - 1)]  # Randomly assign source node from list
 
-        randDst = nodes[randint(0,len(nodes) - 1)]
+        randDst = nodes[random.randint(0,len(nodes) - 1)]
         while(randDst == self.sourceNode):   # Ensure dest node is not equal to source
-            randDst = nodes[randint(0, len(nodes) - 1)]  # Randomly assign dest node from list
+            randDst = nodes[random.randint(0, len(nodes) - 1)]  # Randomly assign dest node from list
         self.destNode   = randDst
         self.resNum = resNum
 
@@ -64,7 +64,7 @@ class Reservation:
 
     def GenArrivalTime(self, my_lambda):
         #seed()
-        randNum = uniform(0.0000000000000001, 1)
+        randNum = random.uniform(0.0000000000000001, 1)
         return round((-1 * log(randNum))/my_lambda)
 
     def GetHoldingTime(self):
@@ -72,11 +72,11 @@ class Reservation:
 
     def GenHoldingTime(self):
         #seed()
-        return ceil((-1 * log(uniform(0.0000000000000001, 1)))/Mu)
+        return ceil((-1 * log(random.uniform(0.0000000000000001, 1)))/Mu)
 
     def GenBkAheadTime(self):
         #seed()
-        return randint(1,100)
+        return random.randint(1,100)
 
     def GetStartT(self):
         return self.start_t
@@ -85,7 +85,7 @@ class Reservation:
 
     def GenSizeRequest(self):
         #seed()
-        return 200 - (randint(1,16) * MAX_SLOT_SIZE)
+        return 200 - (random.randint(1,16) * MAX_SLOT_SIZE)
 
     def GetNumSlots(self):
         return self.num_slots
