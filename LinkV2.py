@@ -5,7 +5,11 @@ from copy import deepcopy
 
 class Link:
     def __init__(self, nodes, length):
-        self.timeWindow     = [[EMPTY] * MAX_NUM_FREQ] * TIME_WNDW_SIZE ## Declare 2D array of Empty (False) time periods and frequencies
+        self.timeWindow     = []
+        for i in range(TIME_WNDW_SIZE):
+            row = [EMPTY] * MAX_NUM_FREQ
+            self.timeWindow.append(row)
+#        self.timeWindow     = [[EMPTY] * MAX_NUM_FREQ] * TIME_WNDW_SIZE ## Declare 2D array of Empty (False) time periods and frequencies
         self.availSlots     = [MAX_NUM_FREQ] * TIME_WNDW_SIZE   # Number to track available slots in time row
         self.nodes          = nodes
         self.length         = length
@@ -83,26 +87,31 @@ class Link:
     def PlaceRes(self, startSlot, size, depth, startDepth):
         i = 0
         j = 0
+        numSlotsFilled = 0
 
 #        for k in range(0, depth):
 #            self.availSlots[startDepth + k] -= size # Mark the time row as having less space
-
-        while(i < size):
-            while(j < depth):
-                try:
-                    self.timeWindow[startDepth + j][startSlot + i] = FULL
-                except:
-                    print("Size", size)
-                    print("Depth", depth)
-                    print("PlaceRes Error:")
-                    print("Time Index   = ", j)
-                    print("Time Max     = ", len(self.timeWindow))
-                    print("Freq Index   = ", i)
-                    print("Freq Max     = ", len(self.timeWindow[j]))
-                    raise
-                j += 1
-            j  = 0
-            i += 1
+#         while(i < size):
+#             while(j < depth):
+#                 try:
+#                     self.timeWindow[startDepth + j][startSlot + i] = FULL
+#                     numSlotsFilled += 1
+#                 except:
+#                     print("Size", size)
+#                     print("Depth", depth)
+#                     print("PlaceRes Error:")
+#                     print("Time Index   = ", j)
+#                     print("Time Max     = ", len(self.timeWindow))
+#                     print("Freq Index   = ", i)
+#                     print("Freq Max     = ", len(self.timeWindow[j]))
+#                     raise
+#                 j += 1
+#             j  = 0
+#             i += 1
+        for i in range(depth):
+            for j in range(size):
+                self.timeWindow[startDepth + i][startSlot + j] = FULL
+                numSlotsFilled += 1
 
     # -------------------------- D e b u g   T o o l s -----------------------------
     def DEBUG_PrintFirstWindowLine(self):
@@ -129,6 +138,16 @@ class Link:
 
     def PrintInfo(self):
         print("Link", self.nodes, "of cost", self.length)
+
+    def PrintGraphic(self):
+        for row in self.timeWindow:
+            for column in row:
+                if column == FULL:
+                    print("[]", end='')
+                else:
+                    print("--", end='')
+            print('')
+
 
     def NodeInLink(self, node):
         for myNode in self.nodes:

@@ -329,7 +329,6 @@ class Network:
         for link in links:
             self.linkDict[link].PlaceRes(startIndex, size, holdingT, startT)
 
-
     # ======================================= M a i n   F u n c t i o n ==========================================
 
     def MainFunction(self, my_lambda, numRes, info = False):
@@ -460,6 +459,9 @@ class Network:
 #        return(self.completedRes, localBlocking, linkBlocking, totalBlocking)
         return self.completedRes, localBlocking, linkBlocking, DEBUG_Total_Time
 
+    def PrintGraphics(self, all=False):
+        self.linkDict["AB"].PrintGraphic()
+
 
 class NetworkError(Exception):
     pass
@@ -476,11 +478,13 @@ def DEBUG_print(msg):
 def ReportResults(indexLambda, avgComp, avgImme, avgProm):
     report = open("Test"+ str(indexLambda) +".txt", 'w')
     report.write("Test for Lambda " + str(LambdaList[indexLambda]))
+    if avgImme + avgProm == 0:
+        avgImme = 1
     report.write("\nComplete Vs Blocked Ratio " + str(avgComp/(avgImme + avgProm)) +'\n\n')
 #    report.write(str(LambdaList[indexLambda]) + ' ' + str(avgComp) + ' ' + str(avgImme) + ' ' + str(avgProm))
     report.close()
 
-def RunTrial(indexLambda, detailed=True):
+def RunTrial(indexLambda, detailed=True, debugGraphic = False):
     avgTime = 0
     avgComp = 0
     avgImme = 0
@@ -501,7 +505,9 @@ def RunTrial(indexLambda, detailed=True):
 
     if detailed:
         print("total time for lambda", myLambda, "was", avgTime, "with an average of", avgTime / NumTrials, "seconds")
+    if debugGraphic:
+        test.PrintGraphics()
     ReportResults(indexLambda, avgComp, avgImme, avgProm)
 
 if __name__ == '__main__':
-    RunTrial(1, detailed=True)
+    RunTrial(1, detailed=True, debugGraphic=True)

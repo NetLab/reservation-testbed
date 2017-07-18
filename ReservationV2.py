@@ -85,7 +85,8 @@ class Reservation:
 
     def GenSizeRequest(self):
         #seed()
-        return 200 - (random.randint(1,16) * MAX_SLOT_SIZE)
+        #return 200 - (random.randint(1,16) * MAX_SLOT_SIZE)
+        return random.randint(1, 200)
 
     def GetNumSlots(self):
         return self.num_slots
@@ -104,6 +105,12 @@ class Reservation:
             return True, None
         return False, ceil((self.size_req/(MAX_SLOT_SIZE * M)) + guard_band)
 
+    def PrintInfo(self):
+        print("Arrival time", self.arrival_t)
+        print("Holding time", self.holding_t)
+        print("Bookahead time", self.holding_t)
+        print("Slot size", self.num_slots)
+
 #Theoretical Maximums with lambda 1:
 # Arrival = 15
 # Start = 110
@@ -116,3 +123,9 @@ def FormatLinkName_List(node1, node2):
 def FormatLinkName_String(nodes):
     return "".join(sorted(nodes))
 
+if __name__ == '__main__':
+    for x in range(1,10):
+        test = Reservation(2.3, "AB", x)
+        test.SetNumSlots(x*500)
+        test.PrintInfo()
+        print('\n')
