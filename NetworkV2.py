@@ -1,4 +1,3 @@
-import random
 from LinkV2 import *
 from copy import deepcopy
 from time import *
@@ -25,6 +24,7 @@ class Network:
         self.promisedBlocking   = 0
 
         self.debugFirstLink     = 0
+        self.DEBUG_ResNum       = []
 
         self.InitNodes(numNodes)
         self.InitLinkList(linkVals)
@@ -222,6 +222,8 @@ class Network:
         path, cost = self.FindShortestPath(src, dst)    # Find the shortest src/dst path, and the cost of that path
         res.SetPath(path)  # Set the shortest path for that reservation
         blocked = res.SetNumSlots(cost)   # Set the number of slots the reservation will take
+        if resNum == 1:
+            print("WooHoo")
         if res.num_slots == None:
             raise
         if blocked:
@@ -311,6 +313,11 @@ class Network:
         size        = res.GetNumSlots()
         holdingT    = res.GetHoldingTime()
         links       = res.GetPath()
+
+        self.DEBUG_ResNum.append(res.resNum)
+
+        if res.resNum == 23:
+            print("1 at", startT, "of size", size)
 
         for link in links:
             self.linkDict[link].PlaceRes(startIndex, size, holdingT, startT)
@@ -443,6 +450,9 @@ class Network:
             print("DEBUG Get List of Open", self.D_Avg_2/ self.D_Num_2, "Total", self.D_Avg_2)
             print("Total Time", DEBUG_Total_Time)
 #        return(self.completedRes, localBlocking, linkBlocking, totalBlocking)
+        DEBUG_file = open('debugResNum.txt', 'w')
+        for resNum in self.DEBUG_ResNum:
+            DEBUG_file.write(resNum, '\n')
         return self.completedRes, localBlocking, linkBlocking, DEBUG_Total_Time
 
     def PrintGraphics(self, all=False):
@@ -461,6 +471,9 @@ def ReportError(funct, msg, info = None):
 def DEBUG_print(msg):
     print(msg)
 
+def DetermineSeed(mySeed):
+    random.seed(a=mySeed)
+
 def ReportResults(indexLambda, avgComp, avgImme, avgProm):
     report = open("Test"+ str(indexLambda) +".txt", 'w')
     report.write("Test for Lambda " + str(LambdaList[indexLambda]))
@@ -475,11 +488,11 @@ def RunTrial(indexLambda, detailed=True, debugGraphic = False):
     avgComp = 0
     avgImme = 0
     avgProm = 0
-
+    DetermineSeed(2)
     myLambda = LambdaList[indexLambda]
     for x in range(NumTrials):
         test = Network(NumNodes, LinkList)
-        complete, immediate, promised, time = test.MainFunction(myLambda, NumRes, info=False)
+        complete, immediate, promised, time = test.MainFunction(myLambda, NumRes, info=True)
         avgTime += time
         avgComp += complete
         avgImme += immediate

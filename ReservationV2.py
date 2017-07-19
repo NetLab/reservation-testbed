@@ -6,12 +6,12 @@ from ConstantsV2 import *
 class Reservation:
     def __init__(self, my_lambda, nodes, resNum):
         self.sourceNode = nodes[random.randint(0,len(nodes) - 1)]  # Randomly assign source node from list
-
         randDst = nodes[random.randint(0,len(nodes) - 1)]
         while(randDst == self.sourceNode):   # Ensure dest node is not equal to source
             randDst = nodes[random.randint(0, len(nodes) - 1)]  # Randomly assign dest node from list
-        self.destNode   = randDst
-        self.resNum = resNum
+        self.destNode       = randDst
+
+        self.resNum         = resNum
 
         self.path           = None
 

@@ -1,5 +1,4 @@
 from operator import attrgetter
-from random import *
 from ReservationV2 import *
 from copy import deepcopy
 
