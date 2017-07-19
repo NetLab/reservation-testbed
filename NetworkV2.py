@@ -281,10 +281,11 @@ class Network:
         size            = res.GetNumSlots() # get the size in slots of the request
         listLinks       = res.GetPath()
         startT          = res.GetStartT()
+        holdT           = res.GetHoldingTime()
 
         self.D_Num_2 += 1
         D_Time_2 = clock()
-        spaceOptions    = self.linkDict[listLinks[0]].GetListOfOpenSpaces(size, startT) # Possible cont. spaces in init. link
+        spaceOptions    = self.linkDict[listLinks[0]].GetListOfOpenSpaces(size, startT, holdT) # Possible cont. spaces in init. link
         if len(spaceOptions) > 0:
             spacesFound = True
         else:
@@ -301,7 +302,7 @@ class Network:
             for link in listLinks[1:]:  # For each link beyond the first in the path
                 self.D_Num_1 += 1
                 D_Time_1 = clock()
-                isFull = self.linkDict[link].CheckContinuousSpace(space, size)  # Check each possible space
+                isFull = self.linkDict[link].CheckContinuousSpace(space, size, startT)  # Check each possible space
                 D_Time_1 = clock() - D_Time_1
                 self.D_Avg_1 += D_Time_1
                 if isFull == FULL:
@@ -510,4 +511,4 @@ def RunTrial(indexLambda, detailed=True, debugGraphic = False):
     ReportResults(indexLambda, avgComp, avgImme, avgProm)
 
 if __name__ == '__main__':
-    RunTrial(1, detailed=True, debugGraphic=True)
+    RunTrial(1, detailed=True, debugGraphic=False)

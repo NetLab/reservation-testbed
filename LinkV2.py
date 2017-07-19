@@ -9,7 +9,6 @@ class Link:
         for i in range(TIME_WNDW_SIZE):
             row = [EMPTY] * MAX_NUM_FREQ
             self.timeWindow.append(row)
-#        self.timeWindow     = [[EMPTY] * MAX_NUM_FREQ] * TIME_WNDW_SIZE ## Declare 2D array of Empty (False) time periods and frequencies
         self.availSlots     = [MAX_NUM_FREQ] * TIME_WNDW_SIZE   # Number to track available slots in time row
         self.nodes          = nodes
         self.length         = length
@@ -27,10 +26,15 @@ class Link:
     # ===================================== R e s e r v a t i o n   W i n d o w ===================================
 
     # For checking if a space exists starting from a current start slot
-    def CheckContinuousSpace(self, startSlot, size):
+    def CheckContinuousSpace(self, startSlot, size, startT):
         for space in range(0, size):
-            if self.timeWindow[startSlot + space] == FULL:
+            curSlot = self.timeWindow[startT][startSlot + space]
+            if curSlot == FULL:
                 return FULL
+            elif curSlot == EMPTY:
+                pass
+            else:
+                raise
 
         return EMPTY
 
@@ -56,14 +60,15 @@ class Link:
             i += 1      # Increment the index
         return False, startSlot    # If no suitable space is found, return False and None
 
-    def GetListOfOpenSpaces(self, size, startT):
+    def GetListOfOpenSpaces(self, size, startT, depth):
         listOfSpaces    = []    # List of spaces of size(size) in the current link
         avail           = 0
         i               = 0
         startSlot       = None
 
-        #if self.availSlots[startT] < size:  # If not enough slots for space to exist
-        #    return listOfSpaces # return the empty list instantly
+        for j in range(depth):
+            if self.availSlots[startT + j] < size:  # If not enough slots for space to exist
+                return listOfSpaces # return the empty list instantly
 
         for space in self.timeWindow[startT]:    # For each space in the current row
             if space == EMPTY:  # If space is empty
@@ -89,25 +94,9 @@ class Link:
         j = 0
         numSlotsFilled = 0
 
-#        for k in range(0, depth):
-#            self.availSlots[startDepth + k] -= size # Mark the time row as having less space
-#         while(i < size):
-#             while(j < depth):
-#                 try:
-#                     self.timeWindow[startDepth + j][startSlot + i] = FULL
-#                     numSlotsFilled += 1
-#                 except:
-#                     print("Size", size)
-#                     print("Depth", depth)
-#                     print("PlaceRes Error:")
-#                     print("Time Index   = ", j)
-#                     print("Time Max     = ", len(self.timeWindow))
-#                     print("Freq Index   = ", i)
-#                     print("Freq Max     = ", len(self.timeWindow[j]))
-#                     raise
-#                 j += 1
-#             j  = 0
-#             i += 1
+        for k in range(0, depth):
+            self.availSlots[startDepth + k] -= size # Mark the time row as having less space
+
         for i in range(depth):
             for j in range(size):
                 self.timeWindow[startDepth + i][startSlot + j] = FULL
