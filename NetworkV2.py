@@ -255,21 +255,6 @@ class Network:
                     res.arrival_t, res.book_t, res.start_t, res.num_slots))
 
     # ------------------ H a n d l e   R e s e r v a t i o n s ---------------------
-    #def FwdResToLink(self, res, link):
-    def DEBUG_PrintTypesInList(self, list):
-        for obj in list:
-            print("Object type", type(obj))
-
-    def DEBUG_PrintListOfRes(self, resList):
-        for res in resList:
-            print("Reservation from", res.GetSrcDst(), "with next path", res.GetNextPathLink(), "Arriving at", res.GetNextTime(), "for", res.GetHoldingTime(), "of width", res.GetNumSlots())
-
-    def DEBUG_ERROR_CheckValidRes(self, resList): # ensure all objects in list are of type reservation
-        for res in resList:
-            if type(res) != Reservation:
-                return False
-        return True
-
     # For use upon reservations initial arrival at first node. Checks if a continuous space is open on its path right now.
     #   Returns the first index found. Blocks if none.
     def CheckInitialPathOpen(self, res):
@@ -505,7 +490,7 @@ def RunTrial(indexLambda, detailed=True, debugGraphic = False):
     avgProm = avgProm / NumTrials
 
     if detailed:
-        print("total time for lambda", myLambda, "was", avgTime, "with an average of", avgTime / NumTrials, "seconds")
+        print("total time for lambda", myLambda, "was", avgTime * NumTrials, "with an average of", avgTime, "seconds")
     if debugGraphic:
         test.PrintGraphics()
     ReportResults(indexLambda, avgComp, avgImme, avgProm)
