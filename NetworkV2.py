@@ -216,14 +216,12 @@ class Network:
     # ---------------- G e n e r a t e   R e s e r v a t i o n s -------------------
 
     # Generate a reservation with random values
-    def CreateRes(self, my_lambda, nodes, resNum):
-        res = Reservation(my_lambda, nodes, resNum)
+    def CreateRes(self, my_lambda, nodes, resNum, prevArrivalT):
+        res = Reservation(my_lambda, nodes, resNum, prevArrivalT)
         src, dst = res.GetSrcDst()  # Get the source and destination nodes for the reservation
         path, cost = self.FindShortestPath(src, dst)    # Find the shortest src/dst path, and the cost of that path
         res.SetPath(path)  # Set the shortest path for that reservation
         blocked = res.SetNumSlots(cost)   # Set the number of slots the reservation will take
-        if resNum == 1:
-            print("WooHoo")
         if res.num_slots == None:
             raise
         if blocked:
@@ -231,15 +229,18 @@ class Network:
             print("M = 0?")
         else:
             self.initialResList.append(res)
+        return res.arrival_t_pre    # Return arrival time generated for this reservation
 
     # Generate several reservations with random values
     def CreateMultRes(self, my_lambda, numRes):
         i = 0
+        prevArrivalT = 0
         nodes = self.GetNodes()
         while i < numRes:
-            self.CreateRes(my_lambda, nodes, i)
+            prevArrivalT = self.CreateRes(my_lambda, nodes, i, prevArrivalT)
             i += 1
         self.SortInitResByArrivalT()
+
 
     # Sort res in arrivingResList by their start time
     def SortInitResByArrivalT(self):
@@ -259,7 +260,7 @@ class Network:
     # ------------------ H a n d l e   R e s e r v a t i o n s ---------------------
     # For use upon reservations initial arrival at first node. Checks if a continuous space is open on its path right now.
     #   Returns the first index found. Blocks if none.
-    def CheckInitialPathOpen(self, res):
+    def CheckInitialPathOpen(self, res, arrivalcheck):
         listLinks       = []  # List of links in path to check
         spaceOptions    = []  # Options for continuous blocks of space to check in path
         pathSpace       = None # The final decided continuous (persistent) start location for the reservation
@@ -267,12 +268,15 @@ class Network:
 
         size            = res.GetNumSlots() # get the size in slots of the request
         listLinks       = res.GetPath()
-        startT          = res.GetStartT()
+        if arrivalcheck:
+            checkTime   = res.arrival_t
+        else:
+            checkTime   = res.GetStartT()
         holdT           = res.GetHoldingTime()
 
         self.D_Num_2 += 1
         D_Time_2 = clock()
-        spaceOptions    = self.linkDict[listLinks[0]].GetListOfOpenSpaces(size, startT, holdT) # Possible cont. spaces in init. link
+        spaceOptions    = self.linkDict[listLinks[0]].GetListOfOpenSpaces(size, checkTime, holdT) # Possible cont. spaces in init. link
         if len(spaceOptions) > 0:
             spacesFound = True
         else:
@@ -289,7 +293,7 @@ class Network:
             for link in listLinks[1:]:  # For each link beyond the first in the path
                 self.D_Num_1 += 1
                 D_Time_1 = clock()
-                isFull = self.linkDict[link].CheckContinuousSpace(space, size, startT)  # Check each possible space
+                isFull = self.linkDict[link].CheckContinuousSpace(space, size, checkTime)  # Check each possible space
                 D_Time_1 = clock() - D_Time_1
                 self.D_Avg_1 += D_Time_1
                 if isFull == FULL:
@@ -316,13 +320,35 @@ class Network:
 
         self.DEBUG_ResNum.append(res.resNum)
 
-        if res.resNum == 23:
-            print("1 at", startT, "of size", size)
-
         for link in links:
             self.linkDict[link].PlaceRes(startIndex, size, holdingT, startT)
 
     # ======================================= M a i n   F u n c t i o n ==========================================
+
+    def TestRes(self):
+        numRes = 100000
+        avgAr = 0
+        avgHo = 0
+        avgBk = 0
+        avgSR = 0
+        avgSS = 0
+
+        preAr = 0
+        self.CreateMultRes(2, numRes)
+        for res in self.initialResList:
+            avgAr += res.arrival_t_pre - preAr
+            preAr = res.arrival_t_pre
+
+            avgHo += res.holding_t
+            avgBk += res.book_t
+            avgSR += res.size_req
+            avgSS += res.num_slots
+
+        print("Avg Arrival Time", avgAr/numRes)
+        print("Avg Bookahead Time", avgBk/numRes)
+        print("Avg Holding Time", avgHo/numRes)
+        print("Avg Size Req", avgSR/numRes)
+        print("Avg Slot Size", avgSS/numRes)
 
     def MainFunction(self, my_lambda, numRes, info = False):
         # Reservations cannot be deleted in the middle of a list search, so their indexes are saved to be deleted after
@@ -359,7 +385,7 @@ class Network:
                 if res.arrival_t == time:   # If the Res arrives at this time
                     DEBUG_CIPO1_Num     += 1
                     DEBUG_CIPO1_Time    = clock()
-                    hasPath, pathSpace = self.CheckInitialPathOpen(res) # Check to see if there is an opening
+                    hasPath, pathSpace = self.CheckInitialPathOpen(res, True) # Check to see if there is an opening
                     DEBUG_CIPO1_Time    = clock() - DEBUG_CIPO1_Time
                     DEBUG_CIPO1_Avg     += DEBUG_CIPO1_Time
 
@@ -404,7 +430,7 @@ class Network:
             for res in self.arrivingResList:
                 i = 0
                 if res.GetStartT() == time:
-                    hasPath, pathSpace = self.CheckInitialPathOpen(res)  # Check to see if there is an opening
+                    hasPath, pathSpace = self.CheckInitialPathOpen(res, False)  # Check to see if there is an opening
                     if hasPath:
                         self.AllocateAcrossLinks(pathSpace, res)
                         completeOrPBlocked_Index.append(i)
@@ -450,9 +476,7 @@ class Network:
             print("DEBUG Get List of Open", self.D_Avg_2/ self.D_Num_2, "Total", self.D_Avg_2)
             print("Total Time", DEBUG_Total_Time)
 #        return(self.completedRes, localBlocking, linkBlocking, totalBlocking)
-        DEBUG_file = open('debugResNum.txt', 'w')
-        for resNum in self.DEBUG_ResNum:
-            DEBUG_file.write(resNum, '\n')
+
         return self.completedRes, localBlocking, linkBlocking, DEBUG_Total_Time
 
     def PrintGraphics(self, all=False):
@@ -479,7 +503,7 @@ def ReportResults(indexLambda, avgComp, avgImme, avgProm):
     report.write("Test for Lambda " + str(LambdaList[indexLambda]))
     if avgImme + avgProm == 0:
         avgImme = 1
-    report.write("\nComplete Vs Blocked Ratio " + str(avgComp/(avgImme + avgProm)) +'\n\n')
+    report.write("\nBlocked Vs Total Ratio " + str((avgImme + avgProm)/NumRes) +'\n\n')
 #    report.write(str(LambdaList[indexLambda]) + ' ' + str(avgComp) + ' ' + str(avgImme) + ' ' + str(avgProm))
     report.close()
 
@@ -488,9 +512,9 @@ def RunTrial(indexLambda, detailed=True, debugGraphic = False):
     avgComp = 0
     avgImme = 0
     avgProm = 0
-    DetermineSeed(2)
     myLambda = LambdaList[indexLambda]
     for x in range(NumTrials):
+        DetermineSeed(indexLambda * x)
         test = Network(NumNodes, LinkList)
         complete, immediate, promised, time = test.MainFunction(myLambda, NumRes, info=True)
         avgTime += time
@@ -509,4 +533,8 @@ def RunTrial(indexLambda, detailed=True, debugGraphic = False):
     ReportResults(indexLambda, avgComp, avgImme, avgProm)
 
 if __name__ == '__main__':
-    RunTrial(1, detailed=True, debugGraphic=False)
+    RunTrial(0, detailed=True, debugGraphic=False)
+#    test = Network(NumNodes, LinkList)
+#    test.TestRes()
+#    test2 = Network(NumNodes, LinkList)
+#    test2.TestRes()

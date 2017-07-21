@@ -39,9 +39,12 @@ class Link:
         i               = 0
         startSlot       = None
 
-#        for j in range(depth):
-#            if self.availSlots[startT + j] < size:  # If not enough slots for space to exist
-#                return listOfSpaces # return the empty list instantly
+
+#        if self.availSlots[startT] < size:  # If not enough slots for space to exist
+#            return listOfSpaces # return the empty list instantly
+        if startT > len(self.timeWindow):
+            print(startT)
+            raise
 
         for space in self.timeWindow[startT]:    # For each space in the current row
             if space == EMPTY:  # If space is empty
@@ -67,12 +70,16 @@ class Link:
         j = 0
         numSlotsFilled = 0
 
-        for k in range(0, depth):
-            self.availSlots[startDepth + k] -= size # Mark the time row as having less space
+#        for k in range(0, depth):
+#            self.availSlots[startDepth + k] -= size # Mark the time row as having less space
 
         for i in range(depth):
             for j in range(size):
-                self.timeWindow[startDepth + i][startSlot + j] = FULL
+                try:
+                    self.timeWindow[startDepth + i][startSlot + j] = FULL
+                except:
+                    print(startDepth)
+                    raise
                 numSlotsFilled += 1
 
     # =================================== O t h e r   L i n k   F u n c t i o n s =================================

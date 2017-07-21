@@ -19,17 +19,23 @@ from NetworkV2 import *
 def CompileReport():
     reports = []
     for x in range(0,NumLambdas):
-        report = open("Test" + str(x) + ".txt", 'r')
-        for line in report:
-            reports.append(line)
-        report.close()
+        try:
+            report = open("Test" + str(x) + ".txt", 'r')
+            for line in report:
+                reports.append(line)
+            report.close()
+        except:
+            print("Report", x, "Not Found")
     finalReport = open("FinalReport.txt", 'w')
     for rLine in reports:
         finalReport.write(rLine)
         finalReport.write('\n')
     finalReport.close()
     for x in range(0, NumLambdas):
-        os.remove("Test" + str(x) + ".txt")
+        try:
+            os.remove("Test" + str(x) + ".txt")
+        except:
+            pass
 
 
 

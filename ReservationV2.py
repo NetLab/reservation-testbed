@@ -4,7 +4,7 @@ from math import floor, ceil, log
 from ConstantsV2 import *
 
 class Reservation:
-    def __init__(self, my_lambda, nodes, resNum):
+    def __init__(self, my_lambda, nodes, resNum, prevArrivalT):
         self.sourceNode = nodes[random.randint(0,len(nodes) - 1)]  # Randomly assign source node from list
         randDst = nodes[random.randint(0,len(nodes) - 1)]
         while(randDst == self.sourceNode):   # Ensure dest node is not equal to source
@@ -14,8 +14,8 @@ class Reservation:
         self.resNum         = resNum
 
         self.path           = None
-
-        self.arrival_t      = self.GenArrivalTime(my_lambda)
+        self.arrival_t_pre  = prevArrivalT + self.GenArrivalTime(my_lambda)
+        self.arrival_t      = round(self.arrival_t_pre)
         self.book_t         = self.GenBkAheadTime()
         self.holding_t      = self.GenHoldingTime()
         self.start_t        = self.arrival_t + self.book_t
@@ -65,7 +65,7 @@ class Reservation:
     def GenArrivalTime(self, my_lambda):
         #seed()
         randNum = random.uniform(0.0000000000000001, 1)
-        return round((-1 * log(randNum))/my_lambda)
+        return ((-1 * log(randNum))/my_lambda)
 
     def GetHoldingTime(self):
         return self.holding_t
@@ -86,7 +86,7 @@ class Reservation:
     def GenSizeRequest(self):
         #seed()
         #return 200 - (random.randint(1,16) * MAX_SLOT_SIZE)
-        return random.randint(1, 200)
+        return random.randint(1, MAX_REQ_SIZE)
 
     def GetNumSlots(self):
         return self.num_slots
@@ -107,6 +107,8 @@ class Reservation:
 
     def PrintInfo(self):
         print("Arrival time", self.arrival_t)
+        print("SD", self.sourceNode, self.destNode)
+        print("Size Request", self.size_req)
         print("Holding time", self.holding_t)
         print("Bookahead time", self.holding_t)
         print("Slot size", self.num_slots)
@@ -124,8 +126,8 @@ def FormatLinkName_String(nodes):
     return "".join(sorted(nodes))
 
 if __name__ == '__main__':
-    for x in range(1,10):
-        test = Reservation(2.3, "AB", x)
-        test.SetNumSlots(x*500)
-        test.PrintInfo()
-        print('\n')
+    random.seed(12345)
+    test = Reservation(2, "AB", 1, 0)
+    test.SetNumSlots(500)
+    test.PrintInfo()
+    print('\n')
