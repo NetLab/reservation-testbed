@@ -11,6 +11,8 @@ class Network:
         self.pathDict           = {}
         self.linkDict           = {}
 
+        self.DEBUG_SrcDstCount  = {}
+
         self.initialResList     = []
         self.arrivingResList    = []
         self.resToBeSlotted     = []
@@ -50,11 +52,15 @@ class Network:
         for node in tempList:
             self.nodeDict[node] = {}
             self.pathDict[node] = {}
+            self.DEBUG_SrcDstCount[node] = {}
+            for node2 in tempList:
+                if node != node2:
+                    self.DEBUG_SrcDstCount[node][node2] = 0
 
     # ------------------------ G e t / S e t ----------------------
     def GetNodes(self):
         nodes = []
-        for node in self.nodeDict:
+        for node in self.pathDict:
             nodes.append(node)
         return ''.join(nodes)
 
@@ -220,6 +226,7 @@ class Network:
         res = Reservation(my_lambda, nodes, resNum, prevArrivalT)
         src, dst = res.GetSrcDst()  # Get the source and destination nodes for the reservation
         path, cost = self.FindShortestPath(src, dst)    # Find the shortest src/dst path, and the cost of that path
+        self.DEBUG_SrcDstCount[src][dst] += 1
         res.SetPath(path)  # Set the shortest path for that reservation
         blocked = res.SetNumSlots(cost)   # Set the number of slots the reservation will take
         if res.num_slots == None:
@@ -229,7 +236,7 @@ class Network:
             print("M = 0?")
         else:
             self.initialResList.append(res)
-        return res.arrival_t_pre    # Return arrival time generated for this reservation
+        return res.arrival_t    # Return arrival time generated for this reservation
 
     # Generate several reservations with random values
     def CreateMultRes(self, my_lambda, numRes):
@@ -296,13 +303,13 @@ class Network:
                 isFull = self.linkDict[link].CheckContinuousSpace(space, size, checkTime)  # Check each possible space
                 D_Time_1 = clock() - D_Time_1
                 self.D_Avg_1 += D_Time_1
-                if isFull == FULL:
-                    hasPath = False
-                    break                   # If the space is full in any link, move on to the next possible space
+                if isFull:
+                    hasPath = False     # If the space is full in any link, move on to the next possible space
+                    break
                 else:
                     hasPath = True
 
-            if hasPath == True:         # If any possible space is empty on every link
+            if hasPath:             # If any possible space is empty on every link
                 return hasPath, pathSpace   # return True and the index of the space
 
         pathSpace = None    # set pathSapce as None
@@ -324,6 +331,21 @@ class Network:
             self.linkDict[link].PlaceRes(startIndex, size, holdingT, startT)
 
     # ======================================= M a i n   F u n c t i o n ==========================================
+
+    def DEBUG_GetNodeFrequencies(self):
+        for node in self.DEBUG_SrcDstCount:
+            total = 0
+            for node2 in self.DEBUG_SrcDstCount[node]:
+                total += self.DEBUG_SrcDstCount[node][node2]
+            print("Count", node, total)
+
+        for node in self.pathDict:
+            for node2 in self.pathDict[node]:
+                try:
+                    print(node, node2, self.pathDict[node][node2][0], self.pathDict[node][node2][1])
+                except:
+                    print(node, node2)
+                    raise
 
     def TestRes(self):
         numRes = 100000

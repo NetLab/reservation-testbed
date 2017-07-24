@@ -25,45 +25,60 @@ class Link:
         for space in range(0, size):
             curSlot = self.timeWindow[startT][startSlot + space]
             if curSlot == FULL:
-                return FULL
+                return True
             elif curSlot == EMPTY:
-                pass
+                continue
             else:
                 raise
 
-        return EMPTY
+        return False
 
     def GetListOfOpenSpaces(self, size, startT, depth):
         listOfSpaces    = []    # List of spaces of size(size) in the current link
-        avail           = 0
-        i               = 0
-        startSlot       = None
 
-
-#        if self.availSlots[startT] < size:  # If not enough slots for space to exist
-#            return listOfSpaces # return the empty list instantly
+        if self.availSlots[startT] < size:  # If not enough slots for space to exist
+            return listOfSpaces # return the empty list instantly
         if startT > len(self.timeWindow):
             print(startT)
             raise
 
-        for space in self.timeWindow[startT]:    # For each space in the current row
-            if space == EMPTY:  # If space is empty
-                if avail == 0:      # If start of new space to be checked
-                    startSlot = i       # Record the start slot of the space
-                avail += 1          # Increment the counter of available space
-            elif space == FULL: # Else if its full
-                avail       = 0     # Reset the counter of available space
-                startSlot   = None  # Reset the start slot of the space
-            else:   # Should not get here
-                print("ERROR: CheckOpenSpace -> Time Window Space =", space)
-                raise
-
-            if avail >= size:   # If a space of suitable size or greater is found
-                # startIndex + (avail - size0 is appended as to get first available space, plus each following space
-                listOfSpaces.append(startSlot + (avail - size))    # append the index of the open space (first or subsequent)
-            i += 1      # Increment the index
-
-        return listOfSpaces   # If at least one suitable space is found, return true and the list of suitable spaces
+        rowChecked = self.timeWindow[startT]
+        i = 0
+        while (i + size - 1 < MAX_NUM_FREQ):
+            #print('1', i)
+            if rowChecked[i] == EMPTY:
+                #print('2', i)
+                if rowChecked[i + size - 1] == EMPTY:
+                    #print('3', i)
+                    wasEmpty = True
+                    for j in range(size - 2):
+                        #print('4', i)
+                        if rowChecked[i + j] == FULL:
+                            #print('4-1', i)
+                            wasEmpty = False
+                            break
+                        else:
+                            #print('4-2', i)
+                            wasEmpty = True
+                    if wasEmpty:
+                        #print('5', i)
+                        listOfSpaces.append(i)
+                        i += 1
+                        while (i + size - 1 < MAX_NUM_FREQ):
+                            #print('6', i)
+                            if rowChecked[i + size - 1] == EMPTY:
+                                listOfSpaces.append(i)
+                                i += 1
+                            else:
+                                i = i + size + 1
+                                break
+                    else:
+                        i = i + size
+                else:
+                    i = i + size
+            else:
+                i += 1
+        return listOfSpaces  # If at least one suitable space is found, return true and the list of suitable spaces
 
     def PlaceRes(self, startSlot, size, depth, startDepth):
         i = 0
@@ -81,6 +96,9 @@ class Link:
                     print(startDepth)
                     raise
                 numSlotsFilled += 1
+        if numSlotsFilled != (size*depth):
+            print(numSlotsFilled, size, depth)
+            raise
 
     # =================================== O t h e r   L i n k   F u n c t i o n s =================================
 

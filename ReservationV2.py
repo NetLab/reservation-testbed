@@ -14,8 +14,7 @@ class Reservation:
         self.resNum         = resNum
 
         self.path           = None
-        self.arrival_t_pre  = prevArrivalT + self.GenArrivalTime(my_lambda)
-        self.arrival_t      = round(self.arrival_t_pre)
+        self.arrival_t      = prevArrivalT + self.GenArrivalTime(my_lambda)
         self.book_t         = self.GenBkAheadTime()
         self.holding_t      = self.GenHoldingTime()
         self.start_t        = self.arrival_t + self.book_t
@@ -65,7 +64,7 @@ class Reservation:
     def GenArrivalTime(self, my_lambda):
         #seed()
         randNum = random.uniform(0.0000000000000001, 1)
-        return ((-1 * log(randNum))/my_lambda)
+        return round((-1 * log(randNum))/my_lambda)
 
     def GetHoldingTime(self):
         return self.holding_t
