@@ -22,17 +22,16 @@ class Link:
 
     def UpdateSize(self, startT, depth):
         if len(self.timeWindow) < startT + depth:
-            for x in range((startT+depth - len(self.timeWindow))):
+            for x in range(10 * (startT+depth - len(self.timeWindow))):
                 row = [EMPTY] * MAX_NUM_FREQ
                 self.timeWindow.append(row)
                 self.availSlots.append(MAX_NUM_FREQ)
 
     # For checking if a space exists starting from a current start slot
     def CheckContinuousSpace(self, startSlot, size, startT, depth):
-        if len(self.timeWindow) < startT + depth:
-            raise
-        for space in range(0, size):
-            curSlot = self.timeWindow[startT][startSlot + space]
+        for row in range(0, depth):
+            for space in range(0, size):
+                curSlot = self.timeWindow[startT + row][startSlot + space]
             if curSlot == FULL:
                 return True
             elif curSlot == EMPTY:
@@ -44,37 +43,23 @@ class Link:
 
     def GetListOfOpenSpaces(self, size, startT, depth):
         listOfSpaces    = []    # List of spaces of size(size) in the current link
-        if self.availSlots[startT] < size:  # If not enough slots for space to exist
-            return listOfSpaces # return the empty list instantly
-        if startT > len(self.timeWindow):
-            print(startT)
-            print(len(self.timeWindow))
-            raise
 
         rowChecked = self.timeWindow[startT]
         i = 0
         while (i + size - 1 < MAX_NUM_FREQ):
-            #print('1', i)
             if rowChecked[i] == EMPTY:
-                #print('2', i)
                 if rowChecked[i + size - 1] == EMPTY:
-                    #print('3', i)
                     wasEmpty = True
                     for j in range(size - 2):
-                        #print('4', i)
                         if rowChecked[i + j] == FULL:
-                            #print('4-1', i)
                             wasEmpty = False
                             break
                         else:
-                            #print('4-2', i)
                             wasEmpty = True
                     if wasEmpty:
-                        #print('5', i)
                         listOfSpaces.append(i)
                         i += 1
                         while (i + size - 1 < MAX_NUM_FREQ):
-                            #print('6', i)
                             if rowChecked[i + size - 1] == EMPTY:
                                 listOfSpaces.append(i)
                                 i += 1

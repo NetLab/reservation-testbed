@@ -280,13 +280,13 @@ class Network:
             return False, pathSpace
         elif len(listLinks) == 1:  # If only one link in path
             return True, spaceOptions[0]    # Return that a path was found, and the first spot found
-        for space in spaceOptions:  # For each possible space
-            pathSpace = space
+        for startSlot in spaceOptions:  # For each possible space
+            pathSpace = startSlot
             for link in listLinks[1:]:  # For each link beyond the first in the path
                 self.D_Num_1 += 1
                 D_Time_1 = clock()
                 self.linkDict[link].UpdateSize(checkTime, holdT)
-                isFull = self.linkDict[link].CheckContinuousSpace(space, size, checkTime, holdT)  # Check each possible space
+                isFull = self.linkDict[link].CheckContinuousSpace(startSlot, size, checkTime, holdT)  # Check each possible space
                 D_Time_1 = clock() - D_Time_1
                 self.D_Avg_1 += D_Time_1
                 if isFull:
