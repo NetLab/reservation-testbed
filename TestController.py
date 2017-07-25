@@ -49,19 +49,23 @@ def InitRun(myLambdaIndex):
 def RandSeed(mySeed):
     random.seed(a=mySeed)
 
+alt = False
 if __name__ == '__main__':
-    results = []
-    timer = clock()
+    if alt == False:
+        results = []
+        timer = clock()
 
-    procPool = multiprocessing.Pool(initializer=WorkerInit)
+        procPool = multiprocessing.Pool(initializer=WorkerInit)
 
-    numCores    = multiprocessing.cpu_count()
-    rangeLambda = range(NumLambdas)
-    numChunks   = ceil(NumLambdas/numCores)
+        numCores    = multiprocessing.cpu_count()
+        rangeLambda = range(NumLambdas)
+        numChunks   = ceil(NumLambdas/numCores)
 
-    results = procPool.map_async(InitRun, rangeLambda, chunksize=numChunks)
-    procPool.close()  # Wait on the results
-    procPool.join()
-    timer = clock() - timer
-    print("Took", timer, "seconds")
-    CompileReport()
+        results = procPool.map_async(InitRun, rangeLambda, chunksize=numChunks)
+        procPool.close()  # Wait on the results
+        procPool.join()
+        timer = clock() - timer
+        print("Took", timer, "seconds")
+        CompileReport()
+    else:
+        CompileReport()

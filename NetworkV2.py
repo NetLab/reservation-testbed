@@ -105,29 +105,15 @@ class Network:
     def InitLinkList(self, linkList):
         self.linkDict.clear()   # Clear any previously existing links
         for link in linkList:
+
             linkNodes = link[L_NodePrIndex]
             linkLength = link[L_LengthIndex]
-            self.linkDict[linkNodes] = Link(linkNodes, linkLength)  # Create a Link object between nodes of a length
-            self.SetNodePairLink(linkNodes, linkLength)             # Update node objects to know their links
 
-    # def InitRandLinks(self):  # Initiate a list of links between nodes on the network from a list of tuples
-    #     self.linkDict.clear()   # Clear any previously existing links
-    #
-    #     for node in self.nodeList:
-    #         i = 0
-    #         numLinks = randint(1,4) # Create between 1 and 3 links for each
-    #
-    #         while(i < numLinks):
-    #             otherNode = self.nodeList[randint(0,NumNodes)]          # Get a random node from the list
-    #             linkNodes = FormatLinkName_List(node + otherNode)  # Get the formatted (ex: AB, not BA) link name
-    #
-    #             if(otherNode == node):  # If both nodes the same
-    #                 pass
-    #             elif(self.linkDict[linkNodes] != None):  # If the link already exists
-    #                 pass
-    #             else:                                                   # Otherwise
-    #                 linkLength = randint(LINK_RAND_MIN, LINK_RAND_MAX)
-    #                 self.linkDict[linkNodes] = Link(linkNodes, linkLength) # Append the link to the list
+            self.linkDict[linkNodes] = Link(linkNodes, linkLength)  # Create a Link object between nodes of a length
+            reversePair = linkNodes[::-1]
+            self.linkDict[reversePair] = Link(reversePair, linkLength)
+
+            self.SetNodePairLink(linkNodes, linkLength)             # Update node objects to know their links
 
     # -------------------------- P r i n t ------------------------
     def PrintLinks(self):    # Print a formatted list of all links on the network and their info
@@ -172,10 +158,6 @@ class Network:
                 if curCost + curLinksDict[node] < costDict[node][P_CostIndex] and solvedDict[node] == False:
                     costDict[node] = [curPath + node, curLinksDict[node] + curCost]
             for node in costDict:
-                if debugInfo:
-                    print("     node:", node)
-                    print("     costDict:", costDict)
-                    print("     costDict[node]:", costDict[node])
                 if costDict[node][P_CostIndex] < curLeastCost and solvedDict[node] == False:
                     curLeastCost = costDict[node][P_CostIndex]
                     curNode = node
@@ -190,11 +172,10 @@ class Network:
                     break
                 pathFound = True                # If loop allowed to fully complete, it marks the end of DSP
         self.pathDict[src][dst] = costDict[dst][P_PathIndex], costDict[dst][P_CostIndex]
-#        self.nodeDict[src].SetPath(dst, costDict[dst][P_PathIndex], costDict[dst][P_CostIndex]) # Record the path to save time in future lookups
+        reversePath = costDict[dst][P_PathIndex][::-1]
+        self.pathDict[dst][src] = reversePath, costDict[dst][P_CostIndex]
         if debugInfo:
             print("Path", costDict[dst][P_PathIndex], "of cost", costDict[dst][P_CostIndex], "from", src, "to", dst)
-        returnPath = costDict[dst][P_PathIndex]
-        returnCost = costDict[dst][P_CostIndex]
         return costDict[dst]
 
     def PathDefinedTo(self, src, dst):
@@ -208,6 +189,7 @@ class Network:
             print(src, dst)
             print(self.pathDict[src])
             raise
+
     def VerifyPath(self, linkPath): # Verify that the listed path exists between links on the network
         i = 0
         pathLen = len(linkPath)
@@ -279,10 +261,13 @@ class Network:
             checkTime   = res.arrival_t
         else:
             checkTime   = res.GetStartT()
+        checkTime = res.GetStartT()
+
         holdT           = res.GetHoldingTime()
 
         self.D_Num_2 += 1
         D_Time_2 = clock()
+        self.linkDict[listLinks[0]].UpdateSize(checkTime, holdT)
         spaceOptions    = self.linkDict[listLinks[0]].GetListOfOpenSpaces(size, checkTime, holdT) # Possible cont. spaces in init. link
         if len(spaceOptions) > 0:
             spacesFound = True
@@ -300,7 +285,8 @@ class Network:
             for link in listLinks[1:]:  # For each link beyond the first in the path
                 self.D_Num_1 += 1
                 D_Time_1 = clock()
-                isFull = self.linkDict[link].CheckContinuousSpace(space, size, checkTime)  # Check each possible space
+                self.linkDict[link].UpdateSize(checkTime, holdT)
+                isFull = self.linkDict[link].CheckContinuousSpace(space, size, checkTime, holdT)  # Check each possible space
                 D_Time_1 = clock() - D_Time_1
                 self.D_Avg_1 += D_Time_1
                 if isFull:
@@ -393,8 +379,9 @@ class Network:
 
         self.CreateMultRes(my_lambda, numRes)
         self.SortInitResByArrivalT()
+        maxTime = self.initialResList[-1].GetStartT() + 100
 
-        for time in range(0, TIME_WNDW_SIZE):
+        for time in range(0, maxTime):
 
             newResArrived   =   False   # Each time, t, set newResArrived to false; check if need to re-sort arrivedResList
             arrivedOrIBlocked_Index.clear()
@@ -431,6 +418,8 @@ class Network:
 
                     DEBUG_Check_Time    = clock() - DEBUG_Check_Time
                     DEBUG_Check_Avg     += DEBUG_Check_Time
+                elif res.arrival_t < time:
+                    raise
                 else:
                     break   # As the lsit is ordered by time: if any do not match, move on to the next step; Checking arrived res
                 i += 1
@@ -484,6 +473,7 @@ class Network:
 
         if(numRes != totalBlocking + self.completedRes):
             ReportError("MainFunction", "Not all of {0} reservations blocked: {1}, or completed: {2}".format(numRes, totalBlocking, self.completedRes))
+            print(len(self.initialResList), len(self.arrivingResList))
             raise NetworkError
         DEBUG_Total_Time = clock() - DEBUG_Total_Time
 
@@ -529,16 +519,16 @@ def ReportResults(indexLambda, avgComp, avgImme, avgProm):
 #    report.write(str(LambdaList[indexLambda]) + ' ' + str(avgComp) + ' ' + str(avgImme) + ' ' + str(avgProm))
     report.close()
 
-def RunTrial(indexLambda, detailed=True, debugGraphic = False):
+def RunTrial(indexLambda, detailed=False, debugGraphic = False):
     avgTime = 0
     avgComp = 0
     avgImme = 0
     avgProm = 0
     myLambda = LambdaList[indexLambda]
     for x in range(NumTrials):
-        DetermineSeed(indexLambda * x)
+        DetermineSeed(indexLambda * x ^ x)
         test = Network(NumNodes, LinkList)
-        complete, immediate, promised, time = test.MainFunction(myLambda, NumRes, info=True)
+        complete, immediate, promised, time = test.MainFunction(myLambda, NumRes, info=False)
         avgTime += time
         avgComp += complete
         avgImme += immediate

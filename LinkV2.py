@@ -20,8 +20,17 @@ class Link:
 
     # ===================================== R e s e r v a t i o n   W i n d o w ===================================
 
+    def UpdateSize(self, startT, depth):
+        if len(self.timeWindow) < startT + depth:
+            for x in range((startT+depth - len(self.timeWindow))):
+                row = [EMPTY] * MAX_NUM_FREQ
+                self.timeWindow.append(row)
+                self.availSlots.append(MAX_NUM_FREQ)
+
     # For checking if a space exists starting from a current start slot
-    def CheckContinuousSpace(self, startSlot, size, startT):
+    def CheckContinuousSpace(self, startSlot, size, startT, depth):
+        if len(self.timeWindow) < startT + depth:
+            raise
         for space in range(0, size):
             curSlot = self.timeWindow[startT][startSlot + space]
             if curSlot == FULL:
@@ -35,11 +44,11 @@ class Link:
 
     def GetListOfOpenSpaces(self, size, startT, depth):
         listOfSpaces    = []    # List of spaces of size(size) in the current link
-
         if self.availSlots[startT] < size:  # If not enough slots for space to exist
             return listOfSpaces # return the empty list instantly
         if startT > len(self.timeWindow):
             print(startT)
+            print(len(self.timeWindow))
             raise
 
         rowChecked = self.timeWindow[startT]
@@ -85,8 +94,8 @@ class Link:
         j = 0
         numSlotsFilled = 0
 
-#        for k in range(0, depth):
-#            self.availSlots[startDepth + k] -= size # Mark the time row as having less space
+        for k in range(0, depth):
+            self.availSlots[startDepth + k] -= size # Mark the time row as having less space
 
         for i in range(depth):
             for j in range(size):

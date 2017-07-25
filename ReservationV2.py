@@ -51,7 +51,7 @@ class Reservation:
     def SetPath(self, path):
         self.path = []
         for nodeIndex in range(0,len(path) - 1):
-            self.path.append(FormatLinkName_String(path[nodeIndex:nodeIndex + 2])) # append each link (Ex: AB, GH, etc.) to path list
+            self.path.append(path[nodeIndex:nodeIndex + 2]) # append each link (Ex: AB, GH, etc.) to path list
         if len(self.path) < 1:
             print("ERROR: Reservation.SetPath -> Path of incorrect length", len(self.path))
             raise
