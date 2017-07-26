@@ -21,11 +21,17 @@ class Link:
     # ===================================== R e s e r v a t i o n   W i n d o w ===================================
 
     def UpdateSize(self, startT, depth):
-        if len(self.timeWindow) < startT + depth:
-            for x in range(10 * (startT+depth - len(self.timeWindow))):
+        windowLength    = len(self.timeWindow)
+        newFrames       = []
+        newAvail        = []
+        if windowLength < startT + depth:
+            for x in range(10 * (startT+depth - windowLength)):
                 row = [EMPTY] * MAX_NUM_FREQ
-                self.timeWindow.append(row)
-                self.availSlots.append(MAX_NUM_FREQ)
+                newFrames.append(row)
+                newAvail.append(MAX_NUM_FREQ)
+
+            self.timeWindow += newFrames
+            self.availSlots += newAvail
 
     # For checking if a space exists starting from a current start slot
     def CheckContinuousSpace(self, startSlot, size, startT, depth):

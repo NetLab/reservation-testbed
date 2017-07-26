@@ -6,7 +6,7 @@ MAX_REQ_SIZE    = 200
 
 NumNodes        = 14
 NumRes          = 50000
-NumTrials       = 1
+NumTrials       = 40
 NumLambdas      = 38
 
 guard_band      = 1
@@ -16,6 +16,9 @@ Mu              = 0.05
 FULL            = True
 EMPTY           = False
 
+# First nineteen take roughly 1.36 hours
+# total takes about 1.55 hours
+# 7/26/17
 LambdaList = [
     2.3, 2.5, 2.7, 2.9,
     3.1, 3.3, 3.5, 3.7, 3.9,

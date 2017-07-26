@@ -19,13 +19,15 @@ from NetworkV2 import *
 def CompileReport():
     reports = []
     for x in range(0,NumLambdas):
-        try:
+        if os.path.isfile("Test" + str(x) + ".txt"):
+            print(x, "found")
             report = open("Test" + str(x) + ".txt", 'r')
             for line in report:
                 reports.append(line)
             report.close()
-        except:
+        else:
             print("Report", x, "Not Found")
+            continue
     finalReport = open("FinalReport.txt", 'w')
     for rLine in reports:
         finalReport.write(rLine)
@@ -49,7 +51,7 @@ def InitRun(myLambdaIndex):
 def RandSeed(mySeed):
     random.seed(a=mySeed)
 
-alt = False
+alt = True
 if __name__ == '__main__':
     if alt == False:
         results = []
@@ -58,6 +60,7 @@ if __name__ == '__main__':
         procPool = multiprocessing.Pool(initializer=WorkerInit)
 
         numCores    = multiprocessing.cpu_count()
+#        rangeLambda = range(NumLambdas)
         rangeLambda = range(NumLambdas)
         numChunks   = ceil(NumLambdas/numCores)
 
