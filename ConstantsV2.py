@@ -1,12 +1,13 @@
 MAX_NUM_FREQ    = 128
-TIME_WNDW_SIZE  = 5000       # Maximum theoretical holding time is around 320
+TIME_WNDW_SIZE  = 5000       # Initial time window size
 MAX_SLOT_SIZE   = 12.5
 MAX_REQ_SIZE    = 200
+STRT_WNDW_SIZE  = 1
 
 
 NumNodes        = 14
 NumRes          = 50000
-NumTrials       = 40
+NumTrials       = 1
 NumLambdas      = 38
 
 guard_band      = 1

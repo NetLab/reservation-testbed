@@ -20,12 +20,12 @@ class Link:
 
     # ===================================== R e s e r v a t i o n   W i n d o w ===================================
 
-    def UpdateSize(self, startT, depth):
+    def UpdateSize(self, startT, depth, windowSize):
         windowLength    = len(self.timeWindow)
         newFrames       = []
         newAvail        = []
-        if windowLength < startT + depth:
-            for x in range(10 * (startT+depth - windowLength)):
+        if windowLength < startT + depth + windowSize:
+            for x in range(10 * (startT + depth + windowSize - windowLength)):
                 row = [EMPTY] * MAX_NUM_FREQ
                 newFrames.append(row)
                 newAvail.append(MAX_NUM_FREQ)
@@ -34,22 +34,22 @@ class Link:
             self.availSlots += newAvail
 
     # For checking if a space exists starting from a current start slot
-    def CheckContinuousSpace(self, startSlot, size, startT, depth):
+    def CheckSpaceFull(self, startSlot, size, startT, depth):
         for row in range(0, depth):
             for space in range(0, size):
                 curSlot = self.timeWindow[startT + row][startSlot + space]
-            if curSlot == FULL:
-                return True
-            elif curSlot == EMPTY:
-                continue
-            else:
-                raise
+                if curSlot == FULL:
+                    return True
+                elif curSlot == EMPTY:
+                    continue
+                else:
+                    raise
 
         return False
+#    def GetOpenSpaceAfter(self, size, startT, ):
 
     def GetListOfOpenSpaces(self, size, startT, depth):
         listOfSpaces    = []    # List of spaces of size(size) in the current link
-
         rowChecked = self.timeWindow[startT]
         i = 0
         while (i + size - 1 < MAX_NUM_FREQ):
@@ -84,18 +84,19 @@ class Link:
         i = 0
         j = 0
         numSlotsFilled = 0
-
         for k in range(0, depth):
             self.availSlots[startDepth + k] -= size # Mark the time row as having less space
 
         for i in range(depth):
             for j in range(size):
-                try:
+                if self.timeWindow[startDepth + i][startSlot + j] != FULL:
                     self.timeWindow[startDepth + i][startSlot + j] = FULL
-                except:
-                    print(startDepth)
+                    numSlotsFilled += 1
+                else:
+                    print("tried to fill slot that was aready full", startSlot, j, startDepth, i)
+                    print("LINK", self.nodes)
+                    #self.PrintGraphic(startSlot + depth)
                     raise
-                numSlotsFilled += 1
         if numSlotsFilled != (size*depth):
             print(numSlotsFilled, size, depth)
             raise
@@ -105,8 +106,8 @@ class Link:
     def PrintInfo(self):
         print("Link", self.nodes, "of cost", self.length)
 
-    def PrintGraphic(self):
-        for row in self.timeWindow:
+    def PrintGraphic(self, end):
+        for row in self.timeWindow[0:end]:
             for column in row:
                 if column == FULL:
                     print("[]", end='')

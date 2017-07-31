@@ -257,17 +257,13 @@ class Network:
 
         size            = res.GetNumSlots() # get the size in slots of the request
         listLinks       = res.GetPath()
-        if arrivalcheck:
-            checkTime   = res.arrival_t
-        else:
-            checkTime   = res.GetStartT()
-        checkTime = res.GetStartT()
+        checkTime       = res.GetStartT()
 
         holdT           = res.GetHoldingTime()
 
         self.D_Num_2 += 1
         D_Time_2 = clock()
-        self.linkDict[listLinks[0]].UpdateSize(checkTime, holdT)
+        self.linkDict[listLinks[0]].UpdateSize(checkTime, holdT, STRT_WNDW_SIZE)
         spaceOptions    = self.linkDict[listLinks[0]].GetListOfOpenSpaces(size, checkTime, holdT) # Possible cont. spaces in init. link
         if len(spaceOptions) > 0:
             spacesFound = True
@@ -277,16 +273,16 @@ class Network:
         self.D_Avg_2 += D_Time_2
 
         if spacesFound == False:    # If no spaces are found
-            return False, pathSpace
+            return False, None
         elif len(listLinks) == 1:  # If only one link in path
             return True, spaceOptions[0]    # Return that a path was found, and the first spot found
         for startSlot in spaceOptions:  # For each possible space
             pathSpace = startSlot
-            for link in listLinks[1:]:  # For each link beyond the first in the path
+            for link in listLinks[1:]:  # For each link beyond the first in the path, as first link has already been confirmed
                 self.D_Num_1 += 1
                 D_Time_1 = clock()
-                self.linkDict[link].UpdateSize(checkTime, holdT)
-                isFull = self.linkDict[link].CheckContinuousSpace(startSlot, size, checkTime, holdT)  # Check each possible space
+                self.linkDict[link].UpdateSize(checkTime, holdT, STRT_WNDW_SIZE)
+                isFull = self.linkDict[link].CheckSpaceFull(startSlot, size, checkTime, holdT)  # Check each possible space
                 D_Time_1 = clock() - D_Time_1
                 self.D_Avg_1 += D_Time_1
                 if isFull:
@@ -296,14 +292,13 @@ class Network:
                     hasPath = True
 
             if hasPath:             # If any possible space is empty on every link
-                return hasPath, pathSpace   # return True and the index of the space
+                return True, pathSpace   # return True and the index of the space
 
-        pathSpace = None    # set pathSapce as None
         if hasPath: # If hasPath is somehow True at this point, raise an error
             print("Oops, I did something wrong")
             raise
 
-        return hasPath, pathSpace
+        return False, None
 
     def AllocateAcrossLinks(self, startIndex, res):
         startT      = res.GetStartT()
