@@ -8,7 +8,6 @@ class Link:
         for i in range(TIME_WNDW_SIZE):
             row = [EMPTY] * MAX_NUM_FREQ
             self.timeWindow.append(row)
-        self.availSlots     = [MAX_NUM_FREQ] * TIME_WNDW_SIZE   # Number to track available slots in time row
         self.nodes          = nodes
         self.length         = length
         self.onFirstLink    = True
@@ -31,7 +30,6 @@ class Link:
                 newAvail.append(MAX_NUM_FREQ)
 
             self.timeWindow += newFrames
-            self.availSlots += newAvail
 
     # For checking if a space exists starting from a current start slot
     def CheckSpaceFull(self, startSlot, size, startT, depth):
@@ -49,7 +47,8 @@ class Link:
 #    def GetOpenSpaceAfter(self, size, startT, ):
 
     def GetListOfOpenSpaces(self, size, startT, depth):
-        listOfSpaces    = []    # List of spaces of size(size) in the current link
+        listOfSpaces    = []    # List of spaces of size(size) in the current row
+
         rowChecked = self.timeWindow[startT]
         i = 0
         while (i + size - 1 < MAX_NUM_FREQ):
@@ -84,8 +83,6 @@ class Link:
         i = 0
         j = 0
         numSlotsFilled = 0
-        for k in range(0, depth):
-            self.availSlots[startDepth + k] -= size # Mark the time row as having less space
 
         for i in range(depth):
             for j in range(size):

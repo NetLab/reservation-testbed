@@ -249,10 +249,7 @@ class Network:
     # ------------------ H a n d l e   R e s e r v a t i o n s ---------------------
     # For use upon reservations initial arrival at first node. Checks if a continuous space is open on its path right now.
     #   Returns the first index found. Blocks if none.
-    def CheckInitialPathOpen(self, res, arrivalcheck):
-        listLinks       = []  # List of links in path to check
-        spaceOptions    = []  # Options for continuous blocks of space to check in path
-        pathSpace       = None # The final decided continuous (persistent) start location for the reservation
+    def CheckInitialPathOpen(self, res):
         hasPath         = False
 
         size            = res.GetNumSlots() # get the size in slots of the request
@@ -369,11 +366,17 @@ class Network:
         DEBUG_HasP_Num      = 0
         DEBUG_NoP_Avg       = 0
         DEBUG_NoP_Num       = 0
+        DEBUG_SC1_Avg       = 0
+        DEBUG_SC1_Num       = 0
+        DEBUG_SC2_Avg       = 0
+        DEBUG_SC2_Num       = 0
 
         DEBUG_Total_Time    = clock()
 
+        DEBUG_CrMult_Avg    = clock()
         self.CreateMultRes(my_lambda, numRes)
         self.SortInitResByArrivalT()
+        DEBUG_CrMult_Avg    = clock() - DEBUG_CrMult_Avg
         maxTime = self.initialResList[-1].GetStartT() + 100
 
         for time in range(0, maxTime):
@@ -389,7 +392,7 @@ class Network:
                 if res.arrival_t == time:   # If the Res arrives at this time
                     DEBUG_CIPO1_Num     += 1
                     DEBUG_CIPO1_Time    = clock()
-                    hasPath, pathSpace = self.CheckInitialPathOpen(res, True) # Check to see if there is an opening
+                    hasPath, pathSpace  = self.CheckInitialPathOpen(res) # Check to see if there is an opening
                     DEBUG_CIPO1_Time    = clock() - DEBUG_CIPO1_Time
                     DEBUG_CIPO1_Avg     += DEBUG_CIPO1_Time
 
@@ -422,6 +425,9 @@ class Network:
 
             DEBUG_Init_Time = clock() - DEBUG_Init_Time
             DEBUG_Init_Avg += DEBUG_Init_Time
+
+            DEBUG_SC1_Num += 1
+            DEBUG_SC1_Time = clock()
             # Clear out res that arrive or immediately block
             arrivedOrIBlocked_Index.sort(reverse=True) # Sort indexes from low to high as deleting reindexes later entries
             for index in arrivedOrIBlocked_Index:
@@ -431,12 +437,15 @@ class Network:
             if newResArrived:   # If any new reservations have arrived
                 self.SortArrivingResByStartT()  # Sort arriving res list if new res have arrived
 
+            DEBUG_SC1_Time = clock() - DEBUG_SC1_Time
+            DEBUG_SC1_Avg   += DEBUG_SC1_Time
+
             DEBUG_Arri_Num += 1
             DEBUG_Arri_Time = clock()
             for res in self.arrivingResList:
                 i = 0
                 if res.GetStartT() == time:
-                    hasPath, pathSpace = self.CheckInitialPathOpen(res, False)  # Check to see if there is an opening
+                    hasPath, pathSpace = self.CheckInitialPathOpen(res)  # Check to see if there is an opening
                     if hasPath:
                         self.AllocateAcrossLinks(pathSpace, res)
                         completeOrPBlocked_Index.append(i)
@@ -448,10 +457,16 @@ class Network:
                     break   # As the lsit is ordered by time: if any do not match, move on to the next step
                 i += 1
 
+            DEBUG_SC2_Num += 1
+            DEBUG_SC2_Time = clock()
+
             # Clear out res that complete or promise block
             completeOrPBlocked_Index.sort(reverse=True)  # Sort indexes from low to high as deleting reindexes later entries
             for index in completeOrPBlocked_Index:
                 self.arrivingResList.pop(index)
+
+            DEBUG_SC2_Time = clock() - DEBUG_SC2_Time
+            DEBUG_SC2_Avg += DEBUG_SC2_Time
 
             DEBUG_Arri_Time = clock() - DEBUG_Arri_Time
             DEBUG_Arri_Avg += DEBUG_Arri_Time
@@ -481,6 +496,9 @@ class Network:
             print("DEBUG_HasNoPath Average", DEBUG_NoP_Avg / DEBUG_NoP_Num, "Total", DEBUG_NoP_Avg)
             print("DEBUG Continuous Open", self.D_Avg_1/ self.D_Num_1, "Total", self.D_Avg_1)
             print("DEBUG Get List of Open", self.D_Avg_2/ self.D_Num_2, "Total", self.D_Avg_2)
+            print("DEBUG Create Reservations", DEBUG_CrMult_Avg)
+            print("DEBUG Sort/Clear 1 Average", DEBUG_SC1_Avg/DEBUG_SC1_Num, "Total", DEBUG_SC1_Avg)
+            print("DEBUG Sort/Clear 2 Average", DEBUG_SC2_Avg/DEBUG_SC2_Num, "Total", DEBUG_SC2_Avg)
             print("Total Time", DEBUG_Total_Time)
 #        return(self.completedRes, localBlocking, linkBlocking, totalBlocking)
 
@@ -540,7 +558,7 @@ def RunTrial(indexLambda, detailed=False, debugGraphic = False):
     ReportResults(indexLambda, avgComp, avgImme, avgProm)
 
 if __name__ == '__main__':
-    RunTrial(34, detailed=True, debugGraphic=False)
+    RunTrial(0, detailed=True, debugGraphic=False)
 #    test = Network(NumNodes, LinkList)
 #    test.TestRes()
 #    test2 = Network(NumNodes, LinkList)

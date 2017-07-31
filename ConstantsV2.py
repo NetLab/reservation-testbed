@@ -2,7 +2,7 @@ MAX_NUM_FREQ    = 128
 TIME_WNDW_SIZE  = 5000       # Initial time window size
 MAX_SLOT_SIZE   = 12.5
 MAX_REQ_SIZE    = 200
-STRT_WNDW_SIZE  = 1
+STRT_WNDW_SIZE  = 10
 
 
 NumNodes        = 14
