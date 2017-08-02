@@ -260,8 +260,20 @@ class Network:
 
         self.D_Num_2 += 1
         D_Time_2 = clock()
-        self.linkDict[listLinks[0]].UpdateSize(checkTime, holdT, STRT_WNDW_SIZE)
-        spaceOptions    = self.linkDict[listLinks[0]].GetListOfOpenSpaces(size, checkTime, holdT) # Possible cont. spaces in init. link
+        leastAvail  = 128
+        linkToCheck = 0
+        i = 0
+        for link in listLinks:
+            linkAvail = self.linkDict[link].GetTimeAvailSlots(checkTime, holdT)
+            if linkAvail < size:
+                return False, None
+            elif linkAvail <= leastAvail:
+                leastAvail  = linkAvail
+                linkToCheck = i
+            i += 1
+
+        #self.linkDict[listLinks[linkToCheck]].UpdateSize(checkTime, holdT, STRT_WNDW_SIZE)
+        spaceOptions    = self.linkDict[listLinks[linkToCheck]].GetListOfOpenSpaces(size, checkTime, holdT) # Possible cont. spaces in init. link
         if len(spaceOptions) > 0:
             spacesFound = True
         else:
@@ -275,18 +287,19 @@ class Network:
             return True, spaceOptions[0]    # Return that a path was found, and the first spot found
         for startSlot in spaceOptions:  # For each possible space
             pathSpace = startSlot
-            for link in listLinks[1:]:  # For each link beyond the first in the path, as first link has already been confirmed
+            for link in listLinks:  # For each link beyond the first in the path, as first link has already been confirmed
                 self.D_Num_1 += 1
                 D_Time_1 = clock()
-                self.linkDict[link].UpdateSize(checkTime, holdT, STRT_WNDW_SIZE)
-                isFull = self.linkDict[link].CheckSpaceFull(startSlot, size, checkTime, holdT)  # Check each possible space
-                D_Time_1 = clock() - D_Time_1
-                self.D_Avg_1 += D_Time_1
-                if isFull:
-                    hasPath = False     # If the space is full in any link, move on to the next possible space
-                    break
-                else:
-                    hasPath = True
+                if link != listLinks[linkToCheck]:  # If link is not the one the list of space options was gotten from
+#                    self.linkDict[link].UpdateSize(checkTime, holdT, STRT_WNDW_SIZE)
+                    isFull = self.linkDict[link].CheckSpaceFull(startSlot, size, checkTime, holdT)  # Check each possible space
+                    D_Time_1 = clock() - D_Time_1
+                    self.D_Avg_1 += D_Time_1
+                    if isFull:
+                        hasPath = False     # If the space is full in any link, move on to the next possible space
+                        break
+                    else:
+                        hasPath = True
 
             if hasPath:             # If any possible space is empty on every link
                 return True, pathSpace   # return True and the index of the space

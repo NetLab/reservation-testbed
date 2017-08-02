@@ -4,6 +4,8 @@ MAX_SLOT_SIZE   = 12.5
 MAX_REQ_SIZE    = 200
 STRT_WNDW_SIZE  = 10
 
+AVAIL_SLOTS_INDEX   = 0     # Index of available slots is the last index in the array
+TIME_WINDOW_INDEX   = 1     # index of actual implementation of time window
 
 NumNodes        = 14
 NumRes          = 50000

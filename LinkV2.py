@@ -6,7 +6,9 @@ class Link:
     def __init__(self, nodes, length):
         self.timeWindow     = []
         for i in range(TIME_WNDW_SIZE):
-            row = [EMPTY] * MAX_NUM_FREQ
+            row = []
+            row.append(MAX_NUM_FREQ)
+            row.append([EMPTY] * MAX_NUM_FREQ)
             self.timeWindow.append(row)
         self.nodes          = nodes
         self.length         = length
@@ -22,20 +24,25 @@ class Link:
     def UpdateSize(self, startT, depth, windowSize):
         windowLength    = len(self.timeWindow)
         newFrames       = []
-        newAvail        = []
         if windowLength < startT + depth + windowSize:
             for x in range(10 * (startT + depth + windowSize - windowLength)):
-                row = [EMPTY] * MAX_NUM_FREQ
+                row     = []
+                row.append(MAX_NUM_FREQ)
+                row.append([EMPTY] * MAX_NUM_FREQ)
                 newFrames.append(row)
-                newAvail.append(MAX_NUM_FREQ)
 
             self.timeWindow += newFrames
 
     # For checking if a space exists starting from a current start slot
     def CheckSpaceFull(self, startSlot, size, startT, depth):
+
+        for row in self.timeWindow[startT:startT+depth]:
+            if row[AVAIL_SLOTS_INDEX] < size:
+                return True
+
         for row in range(0, depth):
             for space in range(0, size):
-                curSlot = self.timeWindow[startT + row][startSlot + space]
+                curSlot = self.timeWindow[startT + row][TIME_WINDOW_INDEX][startSlot + space]
                 if curSlot == FULL:
                     return True
                 elif curSlot == EMPTY:
@@ -44,9 +51,16 @@ class Link:
                     raise
 
         return False
+
+    def GetTimeAvailSlots(self, startT, depth):
+        updateWindow = UpdateSizeOuter(len(self.timeWindow), startT, depth)
+        if updateWindow is not None:
+            self.timeWindow += updateWindow
+        return self.timeWindow[startT][AVAIL_SLOTS_INDEX]
+
     def CheckLineFull(self, startT, slot, depth):
         for row in range(startT, startT + depth):
-            if self.timeWindow[row][slot] == FULL:
+            if self.timeWindow[row][TIME_WINDOW_INDEX][slot] == FULL:
                 return True
             else:
                 continue
@@ -54,9 +68,14 @@ class Link:
 
     def GetListOfOpenSpaces(self, size, startT, depth):
         listOfSpaces    = []    # List of spaces of size(size) in the current row
-
         endT = startT+depth
         i = 0
+
+        for row in self.timeWindow[startT:endT]:
+            total = row[AVAIL_SLOTS_INDEX]
+            if total < size:
+                return listOfSpaces
+
         while (i + size - 1 < MAX_NUM_FREQ):
             #print(1, i)
 #            if self.CheckLineFull(startT, i, depth) == False:
@@ -98,19 +117,22 @@ class Link:
         j = 0
         numSlotsFilled = 0
 
+        for row in range(startDepth,startDepth+depth):
+            self.timeWindow[row][AVAIL_SLOTS_INDEX] -= size
+
         for i in range(depth):
             for j in range(size):
-                if self.timeWindow[startDepth + i][startSlot + j] == EMPTY:
-                    self.timeWindow[startDepth + i][startSlot + j] = FULL
+                if self.timeWindow[startDepth + i][TIME_WINDOW_INDEX][startSlot + j] == EMPTY:
+                    self.timeWindow[startDepth + i][TIME_WINDOW_INDEX][startSlot + j] = FULL
                     numSlotsFilled += 1
-                elif self.timeWindow[startDepth + i][startSlot + j] == FULL:
+                elif self.timeWindow[startDepth + i][TIME_WINDOW_INDEX][startSlot + j] == FULL:
                     print("LINK", self.nodes)
                     self.PrintGraphic(startDepth + depth + 10)
                     print("tried to fill slot that was aready full: StartSlot", startSlot, j, "StartDepth", startDepth, i)
                     print("Dimensions", size, "by", depth)
                     raise
                 else:
-                    print(self.timeWindow[startDepth + i][startSlot + j])
+                    print(self.timeWindow[startDepth + i][TIME_WINDOW_INDEX][startSlot + j])
                     raise
 
         if numSlotsFilled != (size*depth):
@@ -126,7 +148,8 @@ class Link:
         i = 0
         for row in self.timeWindow[0:end]:
             print("{:5} ".format(i), end='')
-            for column in row:
+            window = row[TIME_WINDOW_INDEX]
+            for column in window:
                 if column == FULL:
                     print("[]", end='')
                 else:
@@ -160,10 +183,31 @@ class Link:
 #
 # print("done")
 
-def CheckLineIsFull(window, slot):
-    for row in window:
-        if row[slot] == FULL:
-            return True
-        else:
-            continue
+def CheckLineIsFull(row, slot):
+    for line in row:
+        try:
+            if line[TIME_WINDOW_INDEX][slot] == FULL:
+                return True
+            else:
+                continue
+        except:
+            print(line, slot)
+            print(row)
+            print(row[TIME_WINDOW_INDEX])
+            raise
     return False
+
+def CheckAvailSlots(row):
+    return row[AVAIL_SLOTS_INDEX]
+
+def UpdateSizeOuter(length, startT, depth):
+    windowLength    = length
+    newFrames       = []
+    if windowLength < startT + depth + STRT_WNDW_SIZE:
+        for x in range(10 * (startT + depth + STRT_WNDW_SIZE - windowLength)):
+            row     = []
+            row.append(MAX_NUM_FREQ)
+            row.append([EMPTY] * MAX_NUM_FREQ)
+            newFrames.append(row)
+
+        return newFrames
