@@ -272,7 +272,6 @@ class Network:
                 linkToCheck = i
             i += 1
 
-        #self.linkDict[listLinks[linkToCheck]].UpdateSize(checkTime, holdT, STRT_WNDW_SIZE)
         spaceOptions    = self.linkDict[listLinks[linkToCheck]].GetListOfOpenSpaces(size, checkTime, holdT) # Possible cont. spaces in init. link
         if len(spaceOptions) > 0:
             spacesFound = True
@@ -291,7 +290,6 @@ class Network:
                 self.D_Num_1 += 1
                 D_Time_1 = clock()
                 if link != listLinks[linkToCheck]:  # If link is not the one the list of space options was gotten from
-#                    self.linkDict[link].UpdateSize(checkTime, holdT, STRT_WNDW_SIZE)
                     isFull = self.linkDict[link].CheckSpaceFull(startSlot, size, checkTime, holdT)  # Check each possible space
                     D_Time_1 = clock() - D_Time_1
                     self.D_Avg_1 += D_Time_1
