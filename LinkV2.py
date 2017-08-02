@@ -55,16 +55,18 @@ class Link:
     def GetListOfOpenSpaces(self, size, startT, depth):
         listOfSpaces    = []    # List of spaces of size(size) in the current row
 
-        rowChecked = self.timeWindow[startT]
+        endT = startT+depth
         i = 0
         while (i + size - 1 < MAX_NUM_FREQ):
             #print(1, i)
-            if self.CheckLineFull(startT, i, depth) == False:
+#            if self.CheckLineFull(startT, i, depth) == False:
+            if CheckLineIsFull(self.timeWindow[startT:endT], i) == False:
                 if(i + size - 1) < MAX_NUM_FREQ:
                     checkContinuous = False
                     for j in range(i+1, i + size):
                         #print(2, i)
-                        if self.CheckLineFull(startT, j, depth) == False:
+#                        if self.CheckLineFull(startT, j, depth) == False:
+                        if CheckLineIsFull(self.timeWindow[startT:endT], j) == False:
                             checkContinuous = True
                             continue
                         else:
@@ -76,7 +78,8 @@ class Link:
                         listOfSpaces.append(i)
                         i += 1
                         if (i + size - 1 < MAX_NUM_FREQ):
-                            if self.CheckLineFull(startT, i + size - 1, depth) == True:
+#                            if self.CheckLineFull(startT, i + size - 1, depth) == True:
+                            if CheckLineIsFull(self.timeWindow[startT:endT], i + size - 1) == True:
                                 i = i + size
                                 checkContinuous = False
                             else:
@@ -156,3 +159,11 @@ class Link:
 #
 #
 # print("done")
+
+def CheckLineIsFull(window, slot):
+    for row in window:
+        if row[slot] == FULL:
+            return True
+        else:
+            continue
+    return False
