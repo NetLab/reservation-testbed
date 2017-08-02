@@ -249,12 +249,12 @@ class Network:
     # ------------------ H a n d l e   R e s e r v a t i o n s ---------------------
     # For use upon reservations initial arrival at first node. Checks if a continuous space is open on its path right now.
     #   Returns the first index found. Blocks if none.
-    def CheckInitialPathOpen(self, res):
+    def CheckInitialPathOpen(self, res, offset):
         hasPath         = False
 
         size            = res.GetNumSlots() # get the size in slots of the request
         listLinks       = res.GetPath()
-        checkTime       = res.GetStartT()
+        checkTime       = res.GetStartT() + offset
 
         holdT           = res.GetHoldingTime()
 
@@ -297,16 +297,19 @@ class Network:
 
         return False, None
 
-    def AllocateAcrossLinks(self, startIndex, res):
-        startT      = res.GetStartT()
+    def AllocateAcrossLinks(self, startIndex, offset, res):
+        startT      = res.GetStartT() + offset
         size        = res.GetNumSlots()
         holdingT    = res.GetHoldingTime()
         links       = res.GetPath()
 
-        self.DEBUG_ResNum.append(res.resNum)
-
         for link in links:
-            self.linkDict[link].PlaceRes(startIndex, size, holdingT, startT)
+            try:
+                self.linkDict[link].PlaceRes(startIndex, size, holdingT, startT)
+            except:
+                print("On link", link, "of links", links)
+                print("Error at", startT, startIndex, "of size", size, holdingT, "offset", offset)
+                raise
 
     # ======================================= M a i n   F u n c t i o n ==========================================
 
@@ -377,7 +380,7 @@ class Network:
         self.CreateMultRes(my_lambda, numRes)
         self.SortInitResByArrivalT()
         DEBUG_CrMult_Avg    = clock() - DEBUG_CrMult_Avg
-        maxTime = self.initialResList[-1].GetStartT() + 100
+        maxTime = self.initialResList[-1].GetStartT() + 100 + STRT_WNDW_SIZE
 
         for time in range(0, maxTime):
 
@@ -390,14 +393,21 @@ class Network:
             for res in self.initialResList:
                 i = 0
                 if res.arrival_t == time:   # If the Res arrives at this time
-                    DEBUG_CIPO1_Num     += 1
-                    DEBUG_CIPO1_Time    = clock()
-                    hasPath, pathSpace  = self.CheckInitialPathOpen(res) # Check to see if there is an opening
-                    DEBUG_CIPO1_Time    = clock() - DEBUG_CIPO1_Time
-                    DEBUG_CIPO1_Avg     += DEBUG_CIPO1_Time
+
+                    for offset in range(0, STRT_WNDW_SIZE):
+
+                        DEBUG_CIPO1_Num += 1
+                        DEBUG_CIPO1_Time = clock()
+                        hasPath, pathSpace = self.CheckInitialPathOpen(res, offset) # Check to see if there is an opening
+                        DEBUG_CIPO1_Time    = clock() - DEBUG_CIPO1_Time
+                        DEBUG_CIPO1_Avg     += DEBUG_CIPO1_Time
+
+                        if hasPath:
+                            break
 
                     DEBUG_Check_Num     += 1
                     DEBUG_Check_Time    = clock()
+
                     if hasPath:
                         DEBUG_HasP_Num += 1
                         DEBUG_HasP_Time = clock()
@@ -445,9 +455,19 @@ class Network:
             for res in self.arrivingResList:
                 i = 0
                 if res.GetStartT() == time:
-                    hasPath, pathSpace = self.CheckInitialPathOpen(res)  # Check to see if there is an opening
+                    hasPath = False
+                    for offset in range(0, STRT_WNDW_SIZE):
+                        timeOffset = offset
+                        hasPath, pathSpace = self.CheckInitialPathOpen(res, offset)  # Check to see if there is an opening
+                        if hasPath:
+
+                            break
                     if hasPath:
-                        self.AllocateAcrossLinks(pathSpace, res)
+                        try:
+                            self.AllocateAcrossLinks(pathSpace, timeOffset, res)
+                        except:
+                            print(hasPath, pathSpace, timeOffset, res.start_t)
+                            raise
                         completeOrPBlocked_Index.append(i)
                         self.completedRes += 1
                     else:
@@ -541,7 +561,7 @@ def RunTrial(indexLambda, detailed=False, debugGraphic = False):
     for x in range(NumTrials):
         DetermineSeed(indexLambda * x ^ x)
         test = Network(NumNodes, LinkList)
-        complete, immediate, promised, time = test.MainFunction(myLambda, NumRes, info=False)
+        complete, immediate, promised, time = test.MainFunction(myLambda, NumRes, info=True)
         avgTime += time
         avgComp += complete
         avgImme += immediate

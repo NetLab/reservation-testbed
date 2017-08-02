@@ -44,7 +44,13 @@ class Link:
                     raise
 
         return False
-#    def GetOpenSpaceAfter(self, size, startT, ):
+    def CheckLineFull(self, startT, slot, depth):
+        for row in range(startT, startT + depth):
+            if self.timeWindow[row][slot] == FULL:
+                return True
+            else:
+                continue
+        return False
 
     def GetListOfOpenSpaces(self, size, startT, depth):
         listOfSpaces    = []    # List of spaces of size(size) in the current row
@@ -52,29 +58,34 @@ class Link:
         rowChecked = self.timeWindow[startT]
         i = 0
         while (i + size - 1 < MAX_NUM_FREQ):
-            if rowChecked[i] == EMPTY:
-                if rowChecked[i + size - 1] == EMPTY:
-                    wasEmpty = True
-                    for j in range(size - 2):
-                        if rowChecked[i + j] == FULL:
-                            wasEmpty = False
-                            break
+            #print(1, i)
+            if self.CheckLineFull(startT, i, depth) == False:
+                if(i + size - 1) < MAX_NUM_FREQ:
+                    checkContinuous = False
+                    for j in range(i+1, i + size):
+                        #print(2, i)
+                        if self.CheckLineFull(startT, j, depth) == False:
+                            checkContinuous = True
+                            continue
                         else:
-                            wasEmpty = True
-                    if wasEmpty:
+                            checkContinuous = False
+                            i = j + 1
+                            break
+                    while checkContinuous == True:
+                        #print(3)
                         listOfSpaces.append(i)
                         i += 1
-                        while (i + size - 1 < MAX_NUM_FREQ):
-                            if rowChecked[i + size - 1] == EMPTY:
-                                listOfSpaces.append(i)
-                                i += 1
+                        if (i + size - 1 < MAX_NUM_FREQ):
+                            if self.CheckLineFull(startT, i + size - 1, depth) == True:
+                                i = i + size
+                                checkContinuous = False
                             else:
-                                i = i + size + 1
-                                break
-                    else:
-                        i = i + size
+                                continue
+                        else:
+                            break
                 else:
-                    i = i + size
+                    break
+
             else:
                 i += 1
         return listOfSpaces  # If at least one suitable space is found, return true and the list of suitable spaces
@@ -86,14 +97,19 @@ class Link:
 
         for i in range(depth):
             for j in range(size):
-                if self.timeWindow[startDepth + i][startSlot + j] != FULL:
+                if self.timeWindow[startDepth + i][startSlot + j] == EMPTY:
                     self.timeWindow[startDepth + i][startSlot + j] = FULL
                     numSlotsFilled += 1
-                else:
-                    print("tried to fill slot that was aready full", startSlot, j, startDepth, i)
+                elif self.timeWindow[startDepth + i][startSlot + j] == FULL:
                     print("LINK", self.nodes)
-                    #self.PrintGraphic(startSlot + depth)
+                    self.PrintGraphic(startDepth + depth + 10)
+                    print("tried to fill slot that was aready full: StartSlot", startSlot, j, "StartDepth", startDepth, i)
+                    print("Dimensions", size, "by", depth)
                     raise
+                else:
+                    print(self.timeWindow[startDepth + i][startSlot + j])
+                    raise
+
         if numSlotsFilled != (size*depth):
             print(numSlotsFilled, size, depth)
             raise
@@ -104,13 +120,26 @@ class Link:
         print("Link", self.nodes, "of cost", self.length)
 
     def PrintGraphic(self, end):
+        i = 0
         for row in self.timeWindow[0:end]:
+            print("{:5} ".format(i), end='')
             for column in row:
                 if column == FULL:
                     print("[]", end='')
                 else:
                     print("--", end='')
             print('')
+            i += 1
+        print("      ", end='')
+        for x in range(MAX_NUM_FREQ):
+            print(str(int((x % 1000)/100)) + ' ', end='')
+        print("\n      ", end='')
+        for x in range(MAX_NUM_FREQ):
+            print(str(int((x % 100)/10)) + ' ', end='')
+        print("\n      ", end='')
+        for x in range(MAX_NUM_FREQ):
+            print(str(x % 10) + ' ', end='')
+        print('')
 
     def GetLinkNodes(self):
         return self.nodes[0], self.nodes[1]
