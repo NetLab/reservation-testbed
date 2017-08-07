@@ -51,7 +51,7 @@ def InitRun(myLambdaIndex):
 def RandSeed(mySeed):
     random.seed(a=mySeed)
 
-alt = True
+alt = False
 if __name__ == '__main__':
     if alt == False:
         results = []

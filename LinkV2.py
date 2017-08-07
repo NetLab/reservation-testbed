@@ -49,7 +49,7 @@ class Link:
         for row in range(0, depth):
             for space in range(0, size):
                 curSlot = self.timeWindow[startT + row][startSlot + space]
-                if curSlot == FULL:
+                if curSlot != EMPTY:
                     return True
                 elif curSlot == EMPTY:
                     continue
@@ -64,7 +64,7 @@ class Link:
 
     def CheckLineFull(self, startT, slot, depth):
         for row in range(startT, startT + depth):
-            if self.timeWindow[row][slot] == FULL:
+            if self.timeWindow[row][slot] != EMPTY:
                 return True
             else:
                 continue
@@ -126,9 +126,12 @@ class Link:
         for i in range(depth):
             for j in range(size):
                 if self.timeWindow[startDepth + i][startSlot + j] == EMPTY:
-                    self.timeWindow[startDepth + i][startSlot + j] = FULL
+                    if j == 0 and i == 0:
+                        self.timeWindow[startDepth + i][startSlot + j] = START
+                    else:
+                        self.timeWindow[startDepth + i][startSlot + j] = FULL
                     numSlotsFilled += 1
-                elif self.timeWindow[startDepth + i][startSlot + j] == FULL:
+                elif self.timeWindow[startDepth + i][startSlot + j] == FULL or self.timeWindow[startDepth + i][startSlot + j] == START:
                     print("LINK", self.nodes)
                     self.PrintGraphic(startDepth + depth + 10)
                     print("tried to fill slot that was aready full: StartSlot", startSlot, j, "StartDepth", startDepth, i)
@@ -153,9 +156,15 @@ class Link:
             print("{:5} ".format(i), end='')
             for column in row:
                 if column == FULL:
-                    print("[]", end='')
+                    print("X", end='')
+                elif column == START:
+                    print("O", end='')
+                elif column == EMPTY:
+                    print("-", end='')
                 else:
-                    print("--", end='')
+                    print(column)
+                    raise
+
             print('')
             i += 1
         print("      ", end='')
@@ -187,7 +196,7 @@ class Link:
 
 def CheckLineIsFull(window, slot):
     for row in window:
-        if row[slot] == FULL:
+        if row[slot] != EMPTY:
             return True
         else:
             continue

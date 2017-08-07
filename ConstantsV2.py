@@ -3,6 +3,7 @@ TIME_WNDW_SIZE  = 5000       # Initial time window size
 MAX_SLOT_SIZE   = 12.5
 MAX_REQ_SIZE    = 200
 STRT_WNDW_SIZE  = 10
+STRT_WNDW_RANGE = STRT_WNDW_SIZE + 1
 
 AVAIL_SLOTS_INDEX   = 0     # Index of available slots is the last index in the array
 TIME_WINDOW_INDEX   = 1     # index of actual implementation of time window
@@ -13,11 +14,11 @@ NumTrials       = 1
 NumLambdas      = 38
 
 guard_band      = 1
-Lambda          = 1
 Mu              = 0.05
 
-FULL            = True
-EMPTY           = False
+START           = 3
+FULL            = 2
+EMPTY           = 1
 
 # First nineteen take roughly 1.36 hours
 # total takes about 1.55 hours

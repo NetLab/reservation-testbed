@@ -249,7 +249,7 @@ class Network:
     # ------------------ H a n d l e   R e s e r v a t i o n s ---------------------
     # For use upon reservations initial arrival at first node. Checks if a continuous space is open on its path right now.
     #   Returns the first index found. Blocks if none.
-    def CheckInitialPathOpen(self, res, offset):
+    def CheckInitialPathOpen(self, res, offset, isStarting):
         hasPath         = False
 
         size            = res.GetNumSlots() # get the size in slots of the request
@@ -391,7 +391,7 @@ class Network:
         self.CreateMultRes(my_lambda, numRes)
         self.SortInitResByArrivalT()
         DEBUG_CrMult_Avg    = clock() - DEBUG_CrMult_Avg
-        maxTime = self.initialResList[-1].GetStartT() + 100 + STRT_WNDW_SIZE
+        maxTime = self.initialResList[-1].GetStartT() + 100 + STRT_WNDW_RANGE
 
         for time in range(0, maxTime):
 
@@ -405,11 +405,11 @@ class Network:
                 i = 0
                 if res.arrival_t == time:   # If the Res arrives at this time
 
-                    for offset in range(0, STRT_WNDW_SIZE):
+                    for offset in range(0, STRT_WNDW_RANGE):
 
                         DEBUG_CIPO1_Num += 1
                         DEBUG_CIPO1_Time = clock()
-                        hasPath, pathSpace = self.CheckInitialPathOpen(res, offset) # Check to see if there is an opening
+                        hasPath, pathSpace = self.CheckInitialPathOpen(res, offset, False) # Check to see if there is an opening
                         DEBUG_CIPO1_Time    = clock() - DEBUG_CIPO1_Time
                         DEBUG_CIPO1_Avg     += DEBUG_CIPO1_Time
 
@@ -467,9 +467,9 @@ class Network:
                 i = 0
                 if res.GetStartT() == time:
                     hasPath = False
-                    for offset in range(0, STRT_WNDW_SIZE):
+                    for offset in range(0, STRT_WNDW_RANGE):
                         timeOffset = offset
-                        hasPath, pathSpace = self.CheckInitialPathOpen(res, offset)  # Check to see if there is an opening
+                        hasPath, pathSpace = self.CheckInitialPathOpen(res, offset, True)  # Check to see if there is an opening
                         if hasPath:
 
                             break
@@ -484,6 +484,11 @@ class Network:
                     else:
                         self.promisedBlocking += 1
                         completeOrPBlocked_Index.append(i)
+                        #if offset == 9:
+                        #    for link in res.path:
+                        #        self.PrintGraphics(link, res.start_t + offset + res.holding_t)
+                        #    print(res.start_t, res.num_slots, res.holding_t)
+                        #    raise
                 else:
                     break   # As the lsit is ordered by time: if any do not match, move on to the next step
                 i += 1
@@ -535,8 +540,8 @@ class Network:
 
         return self.completedRes, localBlocking, linkBlocking, DEBUG_Total_Time
 
-    def PrintGraphics(self, all=False):
-        self.linkDict["AB"].PrintGraphic()
+    def PrintGraphics(self, link, end, all=False):
+        self.linkDict[link].PrintGraphic(end)
 
 
 class NetworkError(Exception):
