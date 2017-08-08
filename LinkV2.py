@@ -73,46 +73,23 @@ class Link:
     def GetListOfOpenSpaces(self, size, startT, depth):
         listOfSpaces    = []    # List of spaces of size(size) in the current row
         endT = startT+depth
-        i = 0
 
-#        for avail in self.availSlots[startT:endT]:
-#            if avail < size:
-#                return listOfSpaces
-
-        while (i + size - 1 < MAX_NUM_FREQ):
-            #print(1, i)
-#            if self.CheckLineFull(startT, i, depth) == False:
+        i           = 0
+        numAvail    = 0
+        startSlot   = None
+        while (i < MAX_NUM_FREQ):
             if CheckLineIsFull(self.timeWindow[startT:endT], i) == False:
-                if(i + size - 1) < MAX_NUM_FREQ:
-                    checkContinuous = False
-                    for j in range(i+1, i + size):
-                        #print(2, i)
-#                        if self.CheckLineFull(startT, j, depth) == False:
-                        if CheckLineIsFull(self.timeWindow[startT:endT], j) == False:
-                            checkContinuous = True
-                            continue
-                        else:
-                            checkContinuous = False
-                            i = j + 1
-                            break
-                    while checkContinuous == True:
-                        #print(3)
-                        listOfSpaces.append(i)
-                        i += 1
-                        if (i + size - 1 < MAX_NUM_FREQ):
-#                            if self.CheckLineFull(startT, i + size - 1, depth) == True:
-                            if CheckLineIsFull(self.timeWindow[startT:endT], i + size - 1) == True:
-                                i = i + size
-                                checkContinuous = False
-                            else:
-                                continue
-                        else:
-                            break
-                else:
-                    break
-
+                numAvail += 1
+                if startSlot == None:
+                    startSlot = i
             else:
-                i += 1
+                numAvail    = 0
+                startSlot   = None
+            if numAvail >= size:
+                listOfSpaces.append(startSlot)
+                startSlot += 1
+            i += 1
+
         return listOfSpaces  # If at least one suitable space is found, return true and the list of suitable spaces
 
     def PlaceRes(self, startSlot, size, depth, startDepth):
@@ -169,13 +146,13 @@ class Link:
             i += 1
         print("      ", end='')
         for x in range(MAX_NUM_FREQ):
-            print(str(int((x % 1000)/100)) + ' ', end='')
+            print(str(int((x % 1000)/100)), end='')
         print("\n      ", end='')
         for x in range(MAX_NUM_FREQ):
-            print(str(int((x % 100)/10)) + ' ', end='')
+            print(str(int((x % 100)/10)), end='')
         print("\n      ", end='')
         for x in range(MAX_NUM_FREQ):
-            print(str(x % 10) + ' ', end='')
+            print(str(x % 10), end='')
         print('')
 
     def GetLinkNodes(self):
