@@ -16,12 +16,6 @@ class Link:
 
         self.nodes          = nodes
         self.length         = length
-        self.onFirstLink    = True
-        self.initResList    = []
-        self.currResList    = []
-        self.fwdResList     = []
-        self.curTime        = 0
-        self.numBlocks      = 0
 
     # ===================================== R e s e r v a t i o n   W i n d o w ===================================
 
@@ -40,7 +34,7 @@ class Link:
             self.availSlots += newAvail
 
     # For checking if a space exists starting from a current start slot
-    def CheckSpaceFull(self, startSlot, size, startT, depth):
+    def CheckSpaceFull(self, startSlot, size, checkTime, depth):
 
 #        for row in self.availSlots[startT:startT+depth]:
 #            if row < size:
@@ -48,7 +42,11 @@ class Link:
 
         for row in range(0, depth):
             for space in range(0, size):
-                curSlot = self.timeWindow[startT + row][startSlot + space]
+                try:
+                    curSlot = self.timeWindow[checkTime + row][startSlot + space]
+                except:
+                    print(checkTime, startSlot)
+                    raise
                 if curSlot != EMPTY:
                     return True
                 elif curSlot == EMPTY:
@@ -62,32 +60,45 @@ class Link:
         self.UpdateSize(startT, depth)
         return self.availSlots[startT]
 
-    def CheckLineFull(self, startT, slot, depth):
-        for row in range(startT, startT + depth):
-            if self.timeWindow[row][slot] != EMPTY:
-                return True
-            else:
-                continue
-        return False
-
     def GetListOfOpenSpaces(self, size, startT, depth):
         listOfSpaces    = []    # List of spaces of size(size) in the current row
-        endT = startT+depth
-
+        numAvail        = []
+        startSlot       = []
+        for x in range(STRT_WNDW_RANGE):
+            listOfSpaces.append([])
+            numAvail.append(0)
+            startSlot.append(None)
+        endT = startT+depth + STRT_WNDW_SIZE
         i           = 0
-        numAvail    = 0
-        startSlot   = None
         while (i < MAX_NUM_FREQ):
-            if CheckLineIsFull(self.timeWindow[startT:endT], i) == False:
-                numAvail += 1
-                if startSlot == None:
-                    startSlot = i
-            else:
-                numAvail    = 0
-                startSlot   = None
-            if numAvail >= size:
-                listOfSpaces.append(startSlot)
-                startSlot += 1
+            spaceList = []
+            for x in range(STRT_WNDW_RANGE):
+                spaceList.append(EMPTY)
+            numEmpty = STRT_WNDW_RANGE
+            for row in range(startT,endT):
+                if self.timeWindow[row][i] != EMPTY:
+                    for space in range(STRT_WNDW_RANGE):
+                        if startT + space <= row and row < startT + space + depth:
+                            if spaceList[space] == EMPTY:  # If space was not already invalidated
+                                numEmpty -= 1  # Deincrement the number of possible valid spaces
+                                spaceList[space] = FULL  # Mark space Full
+                if numEmpty == 0:  # If no spaces can be empty after this point
+                    break
+#            freeSpaces = CheckLineIsFull(self.timeWindow[startT:endT], i, depth, STRT_WNDW_RANGE)
+            for space in range(STRT_WNDW_RANGE):
+                if spaceList[space] == EMPTY:
+                    numAvail[space] += 1
+                    if startSlot[space] == None:
+                        startSlot[space] = i
+                    if numAvail[space] >= size:
+                        listOfSpaces[space].append(startSlot[space])
+                        startSlot[space] += 1
+                else:
+                    numAvail[space]     = 0
+                    startSlot[space]    = None
+            #print("For Column", i)
+            #print(freeSpaces)
+            #input()
             i += 1
 
         return listOfSpaces  # If at least one suitable space is found, return true and the list of suitable spaces
@@ -171,16 +182,21 @@ class Link:
 #
 # print("done")
 
-def CheckLineIsFull(window, slot):
-    for row in window:
-        if row[slot] != EMPTY:
-            return True
-        else:
-            continue
-    return False
-
-def CheckAvailSlots(row):
-    return row[AVAIL_SLOTS_INDEX]
+def CheckLineIsFull(window, slot, depth, slideSize):
+    spaceList   = []
+    for x in range(slideSize):
+        spaceList.append(EMPTY)
+    numEmpty    = slideSize
+    for row in range(0,len(window)):
+        if window[row][slot] != EMPTY:
+            for space in range(slideSize):
+                if space <= row and row < space + depth:
+                    if spaceList[space] == EMPTY:    # If space was not already invalidated
+                        numEmpty -= 1                  # Deincrement the number of possible valid spaces
+                        spaceList[space] = FULL         # Mark space Full
+        if numEmpty == 0:  # If no spaces can be empty after this point
+            break
+    return spaceList
 
 def UpdateSizeOuter(length, startT, depth):
     windowLength    = length
@@ -193,3 +209,16 @@ def UpdateSizeOuter(length, startT, depth):
             newFrames.append(row)
 
         return newFrames
+
+if __name__ == '__main__':
+    link = Link('AB', 500)
+    #link.PlaceRes(startSlot, size, depth, startDepth)
+    link.PlaceRes(0, 4, 6, 0)
+    link.PlaceRes(6, 6, 2, 0)
+    link.PlaceRes(4, 2, 3, 4)
+    #link.PlaceRes(5, 1, 1, 2)
+    link.PrintGraphic(7)
+    #link.GetListOfOpenSpaces(size, startT, depth)
+    listOf = link.GetListOfOpenSpaces(2, 0, 4)
+    for thing in listOf:
+        print(thing)

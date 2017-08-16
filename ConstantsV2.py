@@ -5,8 +5,8 @@ MAX_REQ_SIZE    = 200
 STRT_WNDW_SIZE  = 10
 STRT_WNDW_RANGE = STRT_WNDW_SIZE + 1
 
-AVAIL_SLOTS_INDEX   = 0     # Index of available slots is the last index in the array
-TIME_WINDOW_INDEX   = 1     # index of actual implementation of time window
+FREQ_SLOT_INDEX = 0 # Index of available frequency slot
+TIME_SLOT_INDEX = 1 # index of available time slot
 
 NumNodes        = 14
 NumRes          = 50000

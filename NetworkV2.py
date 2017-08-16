@@ -249,12 +249,12 @@ class Network:
     # ------------------ H a n d l e   R e s e r v a t i o n s ---------------------
     # For use upon reservations initial arrival at first node. Checks if a continuous space is open on its path right now.
     #   Returns the first index found. Blocks if none.
-    def CheckInitialPathOpen(self, res, offset, isStarting):
+    def CheckInitialPathOpen(self, res, isStarting):
         hasPath         = False
 
         size            = res.GetNumSlots() # get the size in slots of the request
         listLinks       = res.GetPath()
-        checkTime       = res.GetStartT() + offset
+        startT          = res.GetStartT()
 
         holdT           = res.GetHoldingTime()
 
@@ -264,43 +264,71 @@ class Network:
         linkToCheck = 0
         i = 0
         for link in listLinks:
-            linkAvail = self.linkDict[link].GetTimeAvailSlots(checkTime, holdT)
-            if linkAvail < size:
-                return False, None
-            elif linkAvail <= leastAvail:
+            linkAvail = self.linkDict[link].GetTimeAvailSlots(startT, holdT)
+            #if linkAvail < size:
+            #    return False, None
+            #elif linkAvail <= leastAvail:
+            if linkAvail <= leastAvail:
                 leastAvail  = linkAvail
                 linkToCheck = i
             i += 1
 
-        spaceOptions    = self.linkDict[listLinks[linkToCheck]].GetListOfOpenSpaces(size, checkTime, holdT) # Possible cont. spaces in init. link
-        if len(spaceOptions) > 0:
-            spacesFound = True
-        else:
-            spacesFound = False
+        spaceOptions    = self.linkDict[listLinks[linkToCheck]].GetListOfOpenSpaces(size, startT, holdT) # Possible cont. spaces in init. link
+        i = 0
+        for slide in spaceOptions:
+            if len(slide) > 0:  # If slide of window has an available space
+                spacesFound = True      # Then at least one space was found
+                firstSlideWithSpace = i # Record this slide for if only one link in path
+                break                   # No need to check more
+            else:               # If no spaces are available in this slide
+                spacesFound = False # Maintain that no spaces have been found yet
+            i += 1
         D_Time_2 = clock() - D_Time_2
         self.D_Avg_2 += D_Time_2
+
+        pathSpace = [None, None]
 
         if spacesFound == False:    # If no spaces are found
             return False, None
         elif len(listLinks) == 1:  # If only one link in path
-            return True, spaceOptions[0]    # Return that a path was found, and the first spot found
-        for startSlot in spaceOptions:  # For each possible space
-            pathSpace = startSlot
-            for link in listLinks:  # For each link beyond the first in the path, as first link has already been confirmed
-                self.D_Num_1 += 1
-                D_Time_1 = clock()
-                if link != listLinks[linkToCheck]:  # If link is not the one the list of space options was gotten from
-                    isFull = self.linkDict[link].CheckSpaceFull(startSlot, size, checkTime, holdT)  # Check each possible space
-                    D_Time_1 = clock() - D_Time_1
-                    self.D_Avg_1 += D_Time_1
-                    if isFull:
-                        hasPath = False     # If the space is full in any link, move on to the next possible space
-                        break
-                    else:
-                        hasPath = True
+            pathSpace[TIME_SLOT_INDEX] = startT + firstSlideWithSpace
+            pathSpace[FREQ_SLOT_INDEX] = spaceOptions[firstSlideWithSpace][0]
+            return True, pathSpace    # Return that a path was found, and the first spot found
+
+        pathSpace = [None, None]
+        i = 0
+        self.mostRecentSpaceOptions = spaceOptions
+        self.mostRecentStartT       = startT
+        for slide in spaceOptions:  # For each possible space
+            pathSpace[TIME_SLOT_INDEX] = startT + i
+            for startSlot in slide:
+                pathSpace[FREQ_SLOT_INDEX] = startSlot
+
+                for link in listLinks:  # For each link beyond the first in the path, as first link has already been confirmed
+                    self.D_Num_1 += 1
+                    D_Time_1 = clock()
+
+                    if link != listLinks[linkToCheck]:  # If link is not the one the list of space options was gotten from
+                        try:
+                            isFull = self.linkDict[link].CheckSpaceFull(startSlot, size, startT + i, holdT)  # Check each possible space
+                        except:
+                            print(spaceOptions)
+                            print(slide)
+                            print(startSlot)
+                            raise
+                        D_Time_1 = clock() - D_Time_1
+                        self.D_Avg_1 += D_Time_1
+                        if isFull:
+                            hasPath = False     # If the space is full in any link, move on to the next possible space
+                            break
+                        else:
+                            hasPath = True
+                if hasPath:
+                    break
 
             if hasPath:             # If any possible space is empty on every link
                 return True, pathSpace   # return True and the index of the space
+            i += 1
 
         if hasPath: # If hasPath is somehow True at this point, raise an error
             print("Oops, I did something wrong")
@@ -308,8 +336,13 @@ class Network:
 
         return False, None
 
-    def AllocateAcrossLinks(self, startIndex, offset, res):
-        startT      = res.GetStartT() + offset
+    def AllocateAcrossLinks(self, pathSpace, res):
+        try:
+            startT      = pathSpace[TIME_SLOT_INDEX]
+        except:
+            print(pathSpace)
+            raise
+        startIndex  = pathSpace[FREQ_SLOT_INDEX]
         size        = res.GetNumSlots()
         holdingT    = res.GetHoldingTime()
         links       = res.GetPath()
@@ -319,7 +352,10 @@ class Network:
                 self.linkDict[link].PlaceRes(startIndex, size, holdingT, startT)
             except:
                 print("On link", link, "of links", links)
-                print("Error at", startT, startIndex, "of size", size, holdingT, "offset", offset)
+                print("Error at", startT, startIndex, "of size", size, holdingT)
+
+                print(self.mostRecentSpaceOptions, "HERE")
+                print(self.mostRecentStartT)
                 raise
 
     # ======================================= M a i n   F u n c t i o n ==========================================
@@ -405,16 +441,12 @@ class Network:
                 i = 0
                 if res.arrival_t == time:   # If the Res arrives at this time
 
-                    for offset in range(0, STRT_WNDW_RANGE):
 
-                        DEBUG_CIPO1_Num += 1
-                        DEBUG_CIPO1_Time = clock()
-                        hasPath, pathSpace = self.CheckInitialPathOpen(res, offset, False) # Check to see if there is an opening
-                        DEBUG_CIPO1_Time    = clock() - DEBUG_CIPO1_Time
-                        DEBUG_CIPO1_Avg     += DEBUG_CIPO1_Time
-
-                        if hasPath:
-                            break
+                    DEBUG_CIPO1_Num += 1
+                    DEBUG_CIPO1_Time = clock()
+                    hasPath, pathSpace = self.CheckInitialPathOpen(res, False) # Check to see if there is an opening
+                    DEBUG_CIPO1_Time    = clock() - DEBUG_CIPO1_Time
+                    DEBUG_CIPO1_Avg     += DEBUG_CIPO1_Time
 
                     DEBUG_Check_Num     += 1
                     DEBUG_Check_Time    = clock()
@@ -466,18 +498,14 @@ class Network:
             for res in self.arrivingResList:
                 i = 0
                 if res.GetStartT() == time:
-                    hasPath = False
-                    for offset in range(0, STRT_WNDW_RANGE):
-                        timeOffset = offset
-                        hasPath, pathSpace = self.CheckInitialPathOpen(res, offset, True)  # Check to see if there is an opening
-                        if hasPath:
-
-                            break
+                    hasPath, pathSpace = self.CheckInitialPathOpen(res, True)  # Check to see if there is an opening
                     if hasPath:
                         try:
-                            self.AllocateAcrossLinks(pathSpace, timeOffset, res)
+                            self.AllocateAcrossLinks(pathSpace, res)
                         except:
-                            print(hasPath, pathSpace, timeOffset, res.start_t)
+                            print(pathSpace)
+                            print(res.path)
+                            print("Original start T", res.start_t)
                             raise
                         completeOrPBlocked_Index.append(i)
                         self.completedRes += 1
