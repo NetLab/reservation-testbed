@@ -6,7 +6,7 @@ MAX_REQ_SIZE    = 200
 
 NumNodes        = 14
 NumRes          = 50000
-NumTrials       = 40
+NumTrials       = 1
 NumLambdas      = 38
 
 guard_band      = 1

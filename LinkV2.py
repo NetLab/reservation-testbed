@@ -47,37 +47,49 @@ class Link:
 
         return False
 
+    def CheckLineFull(self, window, slot, depth):
+        for row in range(depth):
+            if window[row][slot] != EMPTY:
+                return True
+            else:
+                continue
+        return False
+
     def GetListOfOpenSpaces(self, size, startT, depth):
         listOfSpaces    = []    # List of spaces of size(size) in the current link
 
         rowChecked = self.timeWindow[startT]
         i = 0
         while (i + size - 1 < MAX_NUM_FREQ):
-            if rowChecked[i] == EMPTY:
-                if rowChecked[i + size - 1] == EMPTY:
-                    wasEmpty = True
-                    for j in range(size - 2):
-                        if rowChecked[i + j] == FULL:
-                            wasEmpty = False
-                            break
+            if self.CheckLineFull(self.timeWindow[startT:startT+depth], i, depth) == False:
+                if(i + size - 1) < MAX_NUM_FREQ:
+                    checkContinuous = False
+                    for j in range(i+1, i + size):
+                        if self.CheckLineFull(self.timeWindow[startT:startT+depth], j, depth) == False:
+                            checkContinuous = True
+                            continue
                         else:
-                            wasEmpty = True
-                    if wasEmpty:
+                            checkContinuous = False
+                            i = j + i
+                            break
+                    while checkContinuous == True:
                         listOfSpaces.append(i)
+                        if len(listOfSpaces) > MAX_NUM_FREQ:
+                            raise
                         i += 1
-                        while (i + size - 1 < MAX_NUM_FREQ):
-                            if rowChecked[i + size - 1] == EMPTY:
-                                listOfSpaces.append(i)
-                                i += 1
+                        if (i + size - 1 < MAX_NUM_FREQ):
+                            if self.CheckLineFull(self.timeWindow[startT:startT + depth], i + size - 1, depth) == False:
+                                i = i + size
+                                checkContinuous = False
                             else:
-                                i = i + size + 1
-                                break
-                    else:
-                        i = i + size
+                                continue
+                        else:
+                            break
                 else:
-                    i = i + size
+                    break
             else:
                 i += 1
+
         return listOfSpaces  # If at least one suitable space is found, return true and the list of suitable spaces
 
     def PlaceRes(self, startSlot, size, depth, startDepth):
@@ -91,7 +103,10 @@ class Link:
         for i in range(depth):
             for j in range(size):
                 try:
-                    self.timeWindow[startDepth + i][startSlot + j] = FULL
+                    if self.timeWindow[startDepth + i][startSlot + j] == EMPTY:
+                        self.timeWindow[startDepth + i][startSlot + j] = FULL
+                    else:
+                        raise
                 except:
                     print(startDepth)
                     raise

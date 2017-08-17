@@ -545,7 +545,7 @@ def RunTrial(indexLambda, detailed=False, debugGraphic = False):
     ReportResults(indexLambda, avgComp, avgImme, avgProm)
 
 if __name__ == '__main__':
-    RunTrial(34, detailed=True, debugGraphic=False)
+    RunTrial(0, detailed=True, debugGraphic=False)
 #    test = Network(NumNodes, LinkList)
 #    test.TestRes()
 #    test2 = Network(NumNodes, LinkList)
