@@ -21,6 +21,12 @@ class Reservation:
         self.size_req       = self.GenSizeRequest()
         self.num_slots      = None
 
+    def LoadRes(self, resVars):
+        self.arrival_t = resVars[0]
+        self.start_t = resVars[0] + resVars[1]
+        self.holding_t = resVars[2]
+        self.num_slots = resVars[3]
+
     def SetNumSlots(self, cost):
         blocked, num_slots = self.GenNumberSlots(cost)
         if blocked:

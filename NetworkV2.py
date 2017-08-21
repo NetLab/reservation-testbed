@@ -230,6 +230,8 @@ class Network:
             i += 1
         self.SortInitResByArrivalT()
 
+    def LoadRes(self, resVars):
+        res = Reservation(1, )
 
     # Sort res in arrivingResList by their start time
     def SortInitResByArrivalT(self):
