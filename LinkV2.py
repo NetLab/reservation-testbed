@@ -213,12 +213,12 @@ def UpdateSizeOuter(length, startT, depth):
 if __name__ == '__main__':
     link = Link('AB', 500)
     #link.PlaceRes(startSlot, size, depth, startDepth)
-    link.PlaceRes(0, 4, 6, 0)
-    link.PlaceRes(6, 6, 2, 0)
-    link.PlaceRes(4, 2, 3, 4)
-    #link.PlaceRes(5, 1, 1, 2)
+    link.PlaceRes(0, 4, 7, 0)
+    link.PlaceRes(6, 6, 4, 0)
+    link.PlaceRes(4, 2, 4, 3)
+    link.PlaceRes(8, 4, 2, 4)
     link.PrintGraphic(7)
     #link.GetListOfOpenSpaces(size, startT, depth)
-    listOf = link.GetListOfOpenSpaces(2, 0, 4)
+    listOf = link.GetListOfOpenSpaces(2, 0, 3)
     for thing in listOf:
         print(thing)
