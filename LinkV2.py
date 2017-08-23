@@ -35,60 +35,78 @@ class Link:
 
     # For checking if a space exists starting from a current start slot
     def CheckContinuousSpace(self, startSlot, size, startT, depth):
-        for row in range(0, depth):
-            for space in range(0, size):
-                curSlot = self.timeWindow[startT + row][startSlot + space]
-            if curSlot == FULL:
-                return True
-            elif curSlot == EMPTY:
-                continue
-            else:
-                raise
-
-        return False
-
-    def CheckLineFull(self, window, slot, depth):
-        for row in range(depth):
-            if window[row][slot] != EMPTY:
+        crossSection = self.timeWindow[startT:startT+depth]
+        endSlot = startSlot + size
+        for column in range(startSlot,endSlot):
+            if CheckLineFull(crossSection, column) == True:
                 return True
             else:
                 continue
+        # for row in range(0, depth):
+        #     for space in range(0, size):
+        #         curSlot = self.timeWindow[startT + row][startSlot + space]
+        #     if curSlot == FULL:
+        #         return True
+        #     elif curSlot == EMPTY:
+        #         continue
+        #     else:
+        #         raise
+
         return False
 
     def GetListOfOpenSpaces(self, size, startT, depth):
         listOfSpaces    = []    # List of spaces of size(size) in the current link
+        endT            = startT + depth
+        numAvail        = 0
+        startIndex      = None
+        numBlocked      = 0
 
-        rowChecked = self.timeWindow[startT]
         i = 0
         while (i + size - 1 < MAX_NUM_FREQ):
-            if self.CheckLineFull(self.timeWindow[startT:startT+depth], i, depth) == False:
-                if(i + size - 1) < MAX_NUM_FREQ:
-                    checkContinuous = False
-                    for j in range(i+1, i + size):
-                        if self.CheckLineFull(self.timeWindow[startT:startT+depth], j, depth) == False:
-                            checkContinuous = True
-                            continue
-                        else:
-                            checkContinuous = False
-                            i = j + i
-                            break
-                    while checkContinuous == True:
-                        listOfSpaces.append(i)
-                        if len(listOfSpaces) > MAX_NUM_FREQ:
-                            raise
-                        i += 1
-                        if (i + size - 1 < MAX_NUM_FREQ):
-                            if self.CheckLineFull(self.timeWindow[startT:startT + depth], i + size - 1, depth) == False:
-                                i = i + size
-                                checkContinuous = False
-                            else:
-                                continue
-                        else:
-                            break
-                else:
-                    break
+            if CheckLineFull(self.timeWindow[startT:endT], i) == False:
+                numAvail += 1
+                if startIndex == None:
+                    startIndex = i
             else:
-                i += 1
+                numAvail    = 0
+                startIndex  = None
+                numBlocked += 1
+            if numAvail >= size:
+                listOfSpaces.append(startIndex)
+                startIndex += 1
+            i += 1
+
+            #         checkContinuous = False
+            #         for j in range(i+1, i + size):
+            #             if CheckLineFull(self.timeWindow[startT:endT], j, depth) == False:
+            #                 checkContinuous = True
+            #                 continue
+            #             else:
+            #                 checkContinuous = False
+            #                 i = j + i
+            #                 break
+            #         while checkContinuous == True:
+            #             listOfSpaces.append(i)
+            #             if len(listOfSpaces) > MAX_NUM_FREQ:
+            #                 raise
+            #             i += 1
+            #             if (i + size - 1 < MAX_NUM_FREQ):
+            #                 if CheckLineFull(self.timeWindow[startT:startT + depth], i + size - 1, depth) == False:
+            #                     i = i + size
+            #                     checkContinuous = False
+            #                 else:
+            #                     continue
+            #             else:
+            #                 break
+            #     else:
+            #         break
+            # else:
+            #     i += 1
+
+#        if numBlocked >= 4:
+#            self.PrintGraphic(startT, endT + 1)
+#            print(listOfSpaces)
+#            raise
 
         return listOfSpaces  # If at least one suitable space is found, return true and the list of suitable spaces
 
@@ -108,7 +126,8 @@ class Link:
                     else:
                         raise
                 except:
-                    print(startDepth)
+                    self.PrintGraphic(startDepth, startDepth + depth + 1)
+                    print(startSlot, startDepth, "size", size, "by", depth)
                     raise
                 numSlotsFilled += 1
         if numSlotsFilled != (size*depth):
@@ -120,17 +139,25 @@ class Link:
     def PrintInfo(self):
         print("Link", self.nodes, "of cost", self.length)
 
-    def PrintGraphic(self):
-        for row in self.timeWindow:
+    def PrintGraphic(self, start, end):
+        for row in self.timeWindow[start:end]:
             for column in row:
                 if column == FULL:
-                    print("[]", end='')
+                    print("X", end='')
                 else:
-                    print("--", end='')
+                    print("-", end='')
             print('')
 
     def GetLinkNodes(self):
         return self.nodes[0], self.nodes[1]
+
+def CheckLineFull(window, slot):
+    for row in window:
+        if row[slot] != EMPTY:
+            return True
+        else:
+            continue
+    return False
 
 # testNode = Network()
 # i = 1
@@ -144,3 +171,4 @@ class Link:
 #
 #
 # print("done")
+
