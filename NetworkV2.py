@@ -230,8 +230,20 @@ class Network:
             i += 1
         self.SortInitResByArrivalT()
 
-    def LoadRes(self, resVars):
-        res = Reservation(1, )
+    def LoadRes(self, resVars, resNum):
+        res = Reservation(1, NodeList, resNum, 0)
+        res.sourceNode  = resVars[R_NodesIndex][0]
+        res.destNode    = resVars[R_NodesIndex][1]
+        res.arrival_t   = resVars[R_ArrivIndex]
+        res.start_t     = resVars[R_StartIndex]
+        res.holding_t   = resVars[R_HoldiIndex]
+        res.num_slots   = resVars[R_NumSlIndex]
+        src, dst = res.GetSrcDst()  # Get the source and destination nodes for the reservation
+        path, cost = self.FindShortestPath(src, dst)  # Find the shortest src/dst path, and the cost of that path
+        res.SetPath(path)  # Set the shortest path for that reservation
+
+        self.initialResList.append(res)
+        return res.path
 
     # Sort res in arrivingResList by their start time
     def SortInitResByArrivalT(self):
@@ -241,12 +253,14 @@ class Network:
     def SortArrivingResByStartT(self):
         self.arrivingResList.sort(key=lambda res: (res.start_t, res.arrival_t, res.resNum))
 
+    def PrintInitialResList(self):
+        for res in self.initialResList:
+            res.PrintInfo()
+
     # Print out arrivingResList
     def PrintArrivingResList(self):
         for res in self.arrivingResList:
-            print(
-                "Reservation arriving at {0:1d}, Bookahead for {1:3d}; Start time at {2:2d} and size of {3:2d}".format(
-                    res.arrival_t, res.book_t, res.start_t, res.num_slots))
+            res.PrintInfo()
 
     # ------------------ H a n d l e   R e s e r v a t i o n s ---------------------
     # For use upon reservations initial arrival at first node. Checks if a continuous space is open on its path right now.
@@ -366,7 +380,7 @@ class Network:
         print("Avg Size Req", avgSR/numRes)
         print("Avg Slot Size", avgSS/numRes)
 
-    def MainFunction(self, my_lambda, numRes, info = False):
+    def MainFunction(self, my_lambda, numRes, genRes = True, info = False):
         # Reservations cannot be deleted in the middle of a list search, so their indexes are saved to be deleted after
         arrivedOrIBlocked_Index     = []
         completeOrPBlocked_Index    = []
@@ -390,7 +404,10 @@ class Network:
         DEBUG_Total_Time    = clock()
 
         DEBUG_CrMult_Avg    = clock()
-        self.CreateMultRes(my_lambda, numRes)
+        if genRes:
+            self.CreateMultRes(my_lambda, numRes)
+        else:
+            numRes = len(self.initialResList)
         self.SortInitResByArrivalT()
         DEBUG_CrMult_Avg    = clock() - DEBUG_CrMult_Avg
         maxTime = self.initialResList[-1].GetStartT() + 100 + STRT_WNDW_RANGE
@@ -595,8 +612,29 @@ def RunTrial(indexLambda, detailed=False, debugGraphic = False):
         test.PrintGraphics()
     ReportResults(indexLambda, avgComp, avgImme, avgProm)
 
+def TestingRun( ResList):
+    listOfInvolvedLinks = []
+    test = Network(NumNodes, LinkList)
+    i = 0
+    for resVars in ResList:
+        path = test.LoadRes(resVars, i)
+        for link in path:
+            if link in listOfInvolvedLinks:
+                continue
+            else:
+                listOfInvolvedLinks.append(link)
+        i += 1
+    test.PrintInitialResList()
+    test.MainFunction(None, None, genRes=False)
+
+    for link in listOfInvolvedLinks:
+        print(link)
+        test.PrintGraphics(link, 10)
+
+
 if __name__ == '__main__':
-    RunTrial(0, detailed=True, debugGraphic=False)
+    #RunTrial(0, detailed=True, debugGraphic=False)
+    TestingRun(TestResList)
 #    test = Network(NumNodes, LinkList)
 #    test.TestRes()
 #    test2 = Network(NumNodes, LinkList)

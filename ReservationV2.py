@@ -113,6 +113,10 @@ class Reservation:
     def PrintInfo(self):
         print("Arrival time", self.arrival_t)
         print("SD", self.sourceNode, self.destNode)
+        print("Path:")
+        for link in self.path:
+            print(link, end='')
+        print()
         print("Size Request", self.size_req)
         print("Holding time", self.holding_t)
         print("Bookahead time", self.holding_t)

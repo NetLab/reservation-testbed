@@ -2,7 +2,7 @@ MAX_NUM_FREQ    = 128
 TIME_WNDW_SIZE  = 5000       # Initial time window size
 MAX_SLOT_SIZE   = 12.5
 MAX_REQ_SIZE    = 200
-STRT_WNDW_SIZE  = 10
+STRT_WNDW_SIZE  = 0
 STRT_WNDW_RANGE = STRT_WNDW_SIZE + 1
 
 AVAIL_SLOTS_INDEX   = 0     # Index of available slots is the last index in the array
@@ -49,14 +49,25 @@ LinkList        = [
     ['LM', 300],
     ['MN', 300]
     ]
+
 TestLinkList    = [
     ['AB', 1100], ['AD', 10],
     ['BC', 5], ['BD', 500],
     ['AC', 2000]
     ]
 
+R_NodesIndex        = 0
+R_ArrivIndex        = 1
+R_StartIndex        = 2
+R_HoldiIndex        = 3
+R_NumSlIndex        = 4
+
 TestResList = [
-    ['AK', 0, 2, 10, 5]
+    ['AB', 1, 1, 5, 2],
+    ['AB', 2, 5, 3, 2],
+    ['AB', 3, 3, 4, 2],
+    ['AB', 4, 7, 3, 2],
+    ['AB', 5, 6, 3, 2],
 ]
 
 N_NameIndex         = 0

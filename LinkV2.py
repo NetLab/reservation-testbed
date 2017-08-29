@@ -46,17 +46,18 @@ class Link:
 #            if row < size:
 #                return True
 
-        for row in range(0, depth):
-            for space in range(0, size):
-                curSlot = self.timeWindow[startT + row][startSlot + space]
-                if curSlot != EMPTY:
-                    return True
-                elif curSlot == EMPTY:
-                    continue
-                else:
-                    raise
+        # for row in range(0, depth):
+        #     for space in range(0, size):
+        #         curSlot = self.timeWindow[startT + row][startSlot + space]
+        #         if curSlot != EMPTY:
+        #             return True
+        #         elif curSlot == EMPTY:
+        #             continue
+        #         else:
+        #             raise
 
-        return False
+        return CheckAreaIsFull(self.timeWindow[startT:startT+depth], startSlot, size)
+
 
     def GetTimeAvailSlots(self, startT, depth):
         self.UpdateSize(startT, depth)
@@ -177,6 +178,15 @@ def CheckLineIsFull(window, slot):
             return True
         else:
             continue
+    return False
+
+def CheckAreaIsFull(window, startSlot, size):
+    for row in window:
+        for column in range(startSlot, startSlot + size):
+            if row[column] != EMPTY:
+                return True
+            else:
+                continue
     return False
 
 def CheckAvailSlots(row):
