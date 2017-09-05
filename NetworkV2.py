@@ -265,7 +265,7 @@ class Network:
     # ------------------ H a n d l e   R e s e r v a t i o n s ---------------------
     # For use upon reservations initial arrival at first node. Checks if a continuous space is open on its path right now.
     #   Returns the first index found. Blocks if none.
-    def CheckInitialPathOpen(self, res, offset, isStarting):
+    def CheckInitialPathOpen(self, res, offset, checkProv):
         hasPath         = False
 
         size            = res.GetNumSlots() # get the size in slots of the request
@@ -288,7 +288,7 @@ class Network:
                 linkToCheck = i
             i += 1
 
-        spaceOptions    = self.linkDict[listLinks[linkToCheck]].GetListOfOpenSpaces(size, checkTime, holdT) # Possible cont. spaces in init. link
+        spaceOptions    = self.linkDict[listLinks[linkToCheck]].GetListOfOpenSpaces(size, checkTime, holdT, checkProv) # Possible cont. spaces in init. link
         if len(spaceOptions) > 0:
             spacesFound = True
         else:
@@ -306,7 +306,7 @@ class Network:
                 self.D_Num_1 += 1
                 D_Time_1 = clock()
                 if link != listLinks[linkToCheck]:  # If link is not the one the list of space options was gotten from
-                    isFull = self.linkDict[link].CheckSpaceFull(startSlot, size, checkTime, holdT)  # Check each possible space
+                    isFull = self.linkDict[link].CheckSpaceFull(startSlot, size, checkTime, holdT, checkProv)  # Check each possible space
                     D_Time_1 = clock() - D_Time_1
                     self.D_Avg_1 += D_Time_1
                     if isFull:
@@ -324,7 +324,7 @@ class Network:
 
         return False, None
 
-    def AllocateAcrossLinks(self, startIndex, offset, res):
+    def AllocateAcrossLinks(self, startIndex, offset, res, isProv):
         startT      = res.GetStartT() + offset
         size        = res.GetNumSlots()
         holdingT    = res.GetHoldingTime()
@@ -332,7 +332,9 @@ class Network:
 
         for link in links:
             try:
-                self.linkDict[link].PlaceRes(startIndex, size, holdingT, startT)
+                if isProv:
+                    self.linkDict[link].AddToProvList(startIndex, startT, startIndex + size, startT + holdingT)
+                self.linkDict[link].PlaceRes(startIndex, size, holdingT, startT, isProv)
             except:
                 print("On link", link, "of links", links)
                 print("Error at", startT, startIndex, "of size", size, holdingT, "offset", offset)
@@ -437,15 +439,23 @@ class Network:
 
                     DEBUG_Check_Num     += 1
                     DEBUG_Check_Time    = clock()
+                    # Start of possible reprovision stage
+                    if hasPath == False:
+                        for offset in range(0, STRT_WNDW_RANGE):
+                            hasPath, pathSpace = self.CheckInitialPathOpen(res, offset, True)
+                            if hasPath:
+                                break
 
                     if hasPath:
                         DEBUG_HasP_Num += 1
                         DEBUG_HasP_Time = clock()
+                        res.ProvisionSpace(pathSpace, offset)
                         self.arrivingResList.append(res)
                         arrivedOrIBlocked_Index.append(i) # Queue the res for deletion
                         newResArrived = True    # Set to true if any new res arrive
                         DEBUG_HasP_Time = clock() - DEBUG_HasP_Time
                         DEBUG_HasP_Avg += DEBUG_HasP_Time
+                        self.AllocateAcrossLinks(pathSpace, offset, res, True)
                     else:
                         DEBUG_NoP_Num += 1
                         DEBUG_NoP_Time = clock()
@@ -488,7 +498,7 @@ class Network:
                     hasPath = False
                     for offset in range(0, STRT_WNDW_RANGE):
                         timeOffset = offset
-                        hasPath, pathSpace = self.CheckInitialPathOpen(res, offset, True)  # Check to see if there is an opening
+                        hasPath, pathSpace = self.CheckInitialPathOpen(res, offset, False)  # Check to see if there is an opening
                         if hasPath:
 
                             break

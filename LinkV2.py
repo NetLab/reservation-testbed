@@ -22,6 +22,7 @@ class Link:
         self.fwdResList     = []
         self.curTime        = 0
         self.numBlocks      = 0
+        self.provResList    = []
 
     # ===================================== R e s e r v a t i o n   W i n d o w ===================================
 
@@ -40,7 +41,7 @@ class Link:
             self.availSlots += newAvail
 
     # For checking if a space exists starting from a current start slot
-    def CheckSpaceFull(self, startSlot, size, startT, depth):
+    def CheckSpaceFull(self, startSlot, size, startT, depth, checkProv):
 
 #        for row in self.availSlots[startT:startT+depth]:
 #            if row < size:
@@ -56,7 +57,7 @@ class Link:
         #         else:
         #             raise
 
-        return CheckAreaIsFull(self.timeWindow[startT:startT+depth], startSlot, size)
+        return CheckAreaIsFull(self.timeWindow[startT:startT+depth], startSlot, size, checkProv)
 
 
     def GetTimeAvailSlots(self, startT, depth):
@@ -71,44 +72,70 @@ class Link:
                 continue
         return False
 
-    def GetListOfOpenSpaces(self, size, startT, depth):
+    def GetListOfOpenSpaces(self, size, startT, depth, checkProv):
         listOfSpaces    = []    # List of spaces of size(size) in the current row
         endT = startT+depth
 
         i           = 0
         numAvail    = 0
         startSlot   = None
-        while (i < MAX_NUM_FREQ):
-            if CheckLineIsFull(self.timeWindow[startT:endT], i) == False:
-                numAvail += 1
-                if startSlot == None:
-                    startSlot = i
-            else:
-                numAvail    = 0
-                startSlot   = None
-            if numAvail >= size:
-                listOfSpaces.append(startSlot)
-                startSlot += 1
-            i += 1
+        canBeReprov = False
+        for x in range(0, STRT_WNDW_RANGE):
+            listOfSpaces = []
+            while (i < MAX_NUM_FREQ):
+                wasFull, preProvRows = CheckLineIsFull(self.timeWindow[startT:endT], i, checkProv, startT)
+                if wasFull == False:
+                    if checkProv:
+                        canBeReprov = True
+                        for row in preProvRows:
+                            canBeReprov = self.CheckReprovision(row, depth, startT)
+                            if canBeReprov == False:
+                                break
+                    if checkProv == False or canBeReprov == True:
+                        numAvail += 1
+                        if startSlot == None:
+                            startSlot = i
+                    else:
+                        numAvail    = 0
+                        startSlot   = None
+                else:
+                    numAvail    = 0
+                    startSlot   = None
+                if numAvail >= size:
+                    listOfSpaces.append(startSlot)
+                    startSlot += 1
+                i += 1
 
         return listOfSpaces  # If at least one suitable space is found, return true and the list of suitable spaces
 
-    def PlaceRes(self, startSlot, size, depth, startDepth):
+    def PlaceRes(self, startSlot, size, depth, startDepth, isProv, resNum):
         i = 0
         j = 0
         numSlotsFilled = 0
-
+        # Remove any overlapping provisions, both the reservations own as well as any previously scheduled that may be reprovisioned
+        self.RemoveOverlappingProv(startSlot, size, depth, startDepth)
         for row in range(startDepth,startDepth+depth):
             self.availSlots[row] -= size
-
+        if isProv:
+            self.AddToProvList(startSlot, startDepth, startSlot+size, startDepth+depth, resNum)
         for i in range(depth):
             for j in range(size):
-                if self.timeWindow[startDepth + i][startSlot + j] == EMPTY:
+                curSlot = self.timeWindow[startDepth + i][startSlot + j]
+                if curSlot == EMPTY:
                     if j == 0 and i == 0:
-                        self.timeWindow[startDepth + i][startSlot + j] = START
+                        if isProv == False:
+                            self.timeWindow[startDepth + i][startSlot + j] = START
+                        else:
+                            self.timeWindow[startDepth + i][startSlot + j] = PROV
                     else:
-                        self.timeWindow[startDepth + i][startSlot + j] = FULL
+                        if isProv == False:
+                            self.timeWindow[startDepth + i][startSlot + j] = FULL
+                        else:
+                            self.timeWindow[startDepth + i][startSlot + j] = PROV
                     numSlotsFilled += 1
+                elif curSlot == PROV:
+                    print("Error: PlaceRes, no provisioned slots should exist at this point")
+                    raise
                 elif self.timeWindow[startDepth + i][startSlot + j] == FULL or self.timeWindow[startDepth + i][startSlot + j] == START:
                     print("LINK", self.nodes)
                     self.PrintGraphic(startDepth + depth + 10)
@@ -122,6 +149,66 @@ class Link:
         if numSlotsFilled != (size*depth):
             print(numSlotsFilled, size, depth)
             raise
+
+    # ================================= P r o v i s i o n i n g   F u n c t i o n s ===============================
+    def AddToProvList(self, startSlot, startDepth, endSlot, endDepth):
+        self.provResList.append([startSlot, startDepth, endSlot, endDepth])
+
+    def RemoveProv(self, provIndex):
+        prov = self.provResList[provIndex]
+
+        provSSlot   = prov[PRV_SSlotIndex]
+        provSDepth  = prov[PRV_SDepthIndex]
+        provESlot   = prov[PRV_ESlotIndex]
+        provEDepth  = prov[PRV_EDepthIndex]
+
+        for row in range(provSDepth, provEDepth):
+            for column in range(provSSlot, provESlot):
+                if self.timeWindow[row][column] == PROV:
+                    self.timeWindow[row][column] = EMPTY
+                else:
+                    print("Error: RemoveProv, slot was not PROV")
+
+        self.provResList.remove(provIndex)
+
+    def FindProvInList(self, slot, depth):
+        slotIndex = 0
+        for prov in self.provResList:
+            provSSlot   = prov[PRV_SSlotIndex]
+            provSDepth  = prov[PRV_SDepthIndex]
+            provESlot   = prov[PRV_ESlotIndex]
+            provEDepth  = prov[PRV_EDepthIndex]
+            if (provSSlot <= slot < provESlot) and (provSDepth <= depth < provEDepth):
+                return True, slotIndex
+            else:
+                continue
+            slotIndex += 1
+        return False, None
+
+
+    def CheckReprovision(self, slot, depth, startT):
+        provExists, provIndex = self.FindProvInList(slot, depth)
+        if provExists:
+            if SMALL_OR_LARGE_WINDOW == SMALL:
+                if startT >= self.provResList[provIndex]:
+                    return True, provIndex
+                else:
+                    return False, None
+            else:
+                return True, provIndex
+        else:
+            return False, None
+
+    # Find and remove any provisions overlapping with the space defined
+    # for use in (tenative) PlaceRes (or some time right before it?)
+    def RemoveOverlappingProv(self, startSlot, size, depth, startDepth):
+        for row in range(startDepth, startDepth + depth):
+            for column in range(startSlot, startSlot + size):
+                provExists, provIndex = self.CheckReprovision(column, row, startDepth)
+                if provExists:
+                    self.RemoveProv(provIndex)
+                else:
+                    continue
 
     # =================================== O t h e r   L i n k   F u n c t i o n s =================================
 
@@ -172,19 +259,29 @@ class Link:
 #
 # print("done")
 
-def CheckLineIsFull(window, slot):
+def CheckLineIsFull(window, slot, checkProv, startT):
+    preProvSlots = []   # List of rows that were preprovisioned. Each must be checked incase they are seperate provisions
+    i = 0
     for row in window:
         if row[slot] != EMPTY:
-            return True
+            if checkProv == True and row[slot] == PROV:
+                preProvSlots.append(startT + i)
+                continue
+            else:
+                return True
         else:
             continue
-    return False
+        i += 1
+    return False, preProvSlots
 
-def CheckAreaIsFull(window, startSlot, size):
+def CheckAreaIsFull(window, startSlot, size, checkProv):
     for row in window:
         for column in range(startSlot, startSlot + size):
             if row[column] != EMPTY:
-                return True
+                if checkProv == True and row[column] == PROV:
+                    continue
+                else:
+                    return True
             else:
                 continue
     return False

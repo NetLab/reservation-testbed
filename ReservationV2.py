@@ -20,6 +20,7 @@ class Reservation:
         self.start_t        = self.arrival_t + self.book_t
         self.size_req       = self.GenSizeRequest()
         self.num_slots      = None
+        self.provSpace      = None
 
     def LoadRes(self, resVars):
         self.arrival_t = resVars[0]
@@ -109,6 +110,13 @@ class Reservation:
             M = 0
             return True, None
         return False, ceil((self.size_req/(MAX_SLOT_SIZE * M)) + guard_band)
+
+    # -------------------- P r o v i s i o n e d   S p a c e -----------------------
+    def ProvisionSpace(self, startSlot, offset):
+        self.provSpace = [startSlot, offset]
+
+    def GetProvisionSpace(self):
+        return self.provSpace
 
     def PrintInfo(self):
         print("Arrival time", self.arrival_t)

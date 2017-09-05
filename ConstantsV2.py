@@ -5,6 +5,10 @@ MAX_REQ_SIZE    = 200
 STRT_WNDW_SIZE  = 0
 STRT_WNDW_RANGE = STRT_WNDW_SIZE + 1
 
+SMALL = True
+LARGE = False
+SMALL_OR_LARGE_WINDOW   = SMALL
+
 AVAIL_SLOTS_INDEX   = 0     # Index of available slots is the last index in the array
 TIME_WINDOW_INDEX   = 1     # index of actual implementation of time window
 
@@ -16,6 +20,7 @@ NumLambdas      = 38
 guard_band      = 1
 Mu              = 0.05
 
+PROV            = 4
 START           = 3
 FULL            = 2
 EMPTY           = 1
@@ -56,11 +61,11 @@ TestLinkList    = [
     ['AC', 2000]
     ]
 
-R_NodesIndex        = 0
-R_ArrivIndex        = 1
-R_StartIndex        = 2
-R_HoldiIndex        = 3
-R_NumSlIndex        = 4
+# R_NodesIndex        = 0
+# R_ArrivIndex        = 1
+# R_StartIndex        = 2
+# R_HoldiIndex        = 3
+# R_NumSlIndex        = 4
 
 TestResList = [
     ['AB', 1, 1, 5, 2],
@@ -87,6 +92,11 @@ R_ArrivIndex        = 1
 R_StartIndex        = 2
 R_HoldiIndex        = 3
 R_NumSlIndex        = 4
+
+PRV_SSlotIndex      = 0
+PRV_SDepthIndex     = 1
+PRV_ESlotIndex      = 2
+PRV_EDepthIndex     = 3
 
 LINK_RAND_MIN       = 300
 LINK_RAND_MAX       = 3000
