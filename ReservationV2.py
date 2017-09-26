@@ -20,7 +20,8 @@ class Reservation:
         self.start_t        = self.arrival_t + self.book_t
         self.size_req       = self.GenSizeRequest()
         self.num_slots      = None
-        self.provSpace      = None
+        self.provSlot       = None
+        self.provTime       = None
 
     def LoadRes(self, resVars):
         self.arrival_t = resVars[0]
@@ -112,29 +113,50 @@ class Reservation:
         return False, ceil((self.size_req/(MAX_SLOT_SIZE * M)) + guard_band)
 
     # -------------------- P r o v i s i o n e d   S p a c e -----------------------
-    def ProvisionSpace(self, startSlot, offset):
-        self.provSpace = [startSlot, offset]
+    def SetProvSpace(self, provTime, provSlot):
+        self.provTime = provTime
+        self.provSlot = provSlot
 
-    def GetProvisionSpace(self):
-        return self.provSpace
+    def GetProvTime(self):
+        return self.provTime
+
+    def GetProvSlot(self):
+        return self.provSlot
+
+    def GetResNum(self):
+        return self.resNum
 
     def PrintInfo(self):
-        print("Arrival time", self.arrival_t)
-        print("SD", self.sourceNode, self.destNode)
-        print("Path:")
+        print("Res No:", self.resNum)
+        print("Arrival time:", self.arrival_t, "Start Time:", self.start_t, "Num Slots", self.num_slots, "Path:", end='')
         for link in self.path:
             print(link, end='')
         print()
-        print("Size Request", self.size_req)
-        print("Holding time", self.holding_t)
-        print("Bookahead time", self.holding_t)
-        print("Slot size", self.num_slots)
 
 #Theoretical Maximums with lambda 1:
 # Arrival = 15
 # Start = 110
 # numslots = 16
 # holding time  = 298 (actual 320)
+
+class ReservationData:
+    def __init__(self, baseStartT, realStartT, startSlot, num_slots, holdingT, resNum):
+        self.bStartT    = baseStartT
+        self.rStartT    = realStartT
+        self.sSlot      = startSlot
+        self.nSlots     = num_slots
+        self.holdingT   = holdingT
+        self.resNum     = resNum
+
+    def SetStartCoords(self, startT, startSlot):
+        self.rStartT    = startT
+        self.sSlot      = startSlot
+
+    def GetData(self):
+        return self.rStartT, self.sSlot, self.nSlots, self.holdingT
+
+    def GetBaseStartT(self):
+        return self.bStartT
 
 def FormatLinkName_List(node1, node2):
     return "".join(sorted(node1 + node2))
@@ -148,3 +170,4 @@ if __name__ == '__main__':
     test.SetNumSlots(500)
     test.PrintInfo()
     print('\n')
+

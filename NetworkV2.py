@@ -14,7 +14,7 @@ class Network:
         self.DEBUG_SrcDstCount  = {}
 
         self.initialResList     = []
-        self.arrivingResList    = []
+        self.provisionedResList = []
         self.resToBeSlotted     = []
         self.completedResList   = []
 
@@ -265,79 +265,260 @@ class Network:
     # ------------------ H a n d l e   R e s e r v a t i o n s ---------------------
     # For use upon reservations initial arrival at first node. Checks if a continuous space is open on its path right now.
     #   Returns the first index found. Blocks if none.
-    def CheckInitialPathOpen(self, res, offset, checkProv):
+    def FindContinuousSpace(self, res):
         hasPath         = False
 
         size            = res.GetNumSlots() # get the size in slots of the request
         listLinks       = res.GetPath()
-        checkTime       = res.GetStartT() + offset
+        baseStartT      = res.GetStartT()
 
         holdT           = res.GetHoldingTime()
 
-        self.D_Num_2 += 1
-        D_Time_2 = clock()
-        leastAvail  = 128
-        linkToCheck = 0
+        for offset in range(0, STRT_WNDW_RANGE):
+            checkTime = baseStartT + offset
+            leastAvail = 128
+            linkToCheck = 0
+            i = 0
+
+            for link in listLinks:
+                linkAvail = self.linkDict[link].GetTimeAvailSlots(checkTime, holdT)
+                if linkAvail <= leastAvail:
+                    leastAvail = linkAvail
+                    linkToCheck = i
+                i += 1
+
+            spaceOptions    = self.linkDict[listLinks[linkToCheck]].GetListOfOpenSpaces(size, checkTime, holdT) # Possible cont. spaces in init. link
+
+            if len(spaceOptions) == 0 :# If no spaces are found at this time
+                continue    # Skip to the next time in window
+            elif len(listLinks) == 1:  # If only one link in path
+                return True, spaceOptions[0], checkTime     # Return that a path was found, and the first spot found
+
+            for startSlot in spaceOptions:  # For each possible space
+                pathSpace = startSlot
+                for link in listLinks:  # For each link beyond the first in the path, as first link has already been confirmed
+                    if link != listLinks[linkToCheck]:  # If link is not the one the list of space options was gotten from
+                        isFull = self.linkDict[link].CheckSpaceFull(startSlot, size, checkTime, holdT)  # Check each possible space
+
+                        if isFull:
+                            hasPath = False     # If the space is full in any link, move on to the next possible space
+                            break
+                        else:
+                            hasPath = True
+
+                if hasPath:             # If any possible space is empty on every link
+                    return True, pathSpace, checkTime   # return True and the index of the space
+
+            if hasPath: # If hasPath is somehow True at this point, raise an error
+                print("Oops, I did something wrong")
+        return False, None, None
+
+    def GetReproWindow(self, res):
+        pathProvisions = []
+        provNotConsidered_Index = []
+        linkList = res.GetPath()
+
+        for link in linkList:
+            pathProvisions += self.linkDict[link].GetProvisionList()
+        pathProvisions.sort(key=lambda prov: (prov.bStartT, prov.resNum))
+
+        minTime         = pathProvisions[0].bStartT
+        # Default maxTime is the max time the res can go to
+        maxTime         = res.GetStartT() + res.GetHoldingT() # Time after which reservations may not be considered.
+        maxWindowSize   = maxTime + STRT_WNDW_RANGE # Maximum depth of time window needed to reprovision
         i = 0
-        for link in listLinks:
-            linkAvail = self.linkDict[link].GetTimeAvailSlots(checkTime, holdT)
-            if linkAvail < size:
-                return False, None
-            elif linkAvail <= leastAvail:
-                leastAvail  = linkAvail
-                linkToCheck = i
+        for prov in pathProvisions:
+            if prov.rStartT > maxTime:
+                provNotConsidered_Index.append(i)
+            elif prov.bStartT + prov.holdingT + STRT_WNDW_RANGE > maxWindowSize:  # If larger time window needed
+                maxWindowSize = prov.bStartT + prov.holdingT + STRT_WNDW_RANGE  # Set new time window size
             i += 1
+        provNotConsidered_Index.sort(reverse=True)  # Sort indexes to be removed in high->low as to not reindex
+        for prov_Index in provNotConsidered_Index:
+            pathProvisions.pop(prov_Index)  # Remove each index
 
-        spaceOptions    = self.linkDict[listLinks[linkToCheck]].GetListOfOpenSpaces(size, checkTime, holdT, checkProv) # Possible cont. spaces in init. link
-        if len(spaceOptions) > 0:
-            spacesFound = True
-        else:
-            spacesFound = False
-        D_Time_2 = clock() - D_Time_2
-        self.D_Avg_2 += D_Time_2
+        return minTime, maxTime, maxWindowSize, pathProvisions
 
-        if spacesFound == False:    # If no spaces are found
-            return False, None
-        elif len(listLinks) == 1:  # If only one link in path
-            return True, spaceOptions[0]    # Return that a path was found, and the first spot found
-        for startSlot in spaceOptions:  # For each possible space
-            pathSpace = startSlot
-            for link in listLinks:  # For each link beyond the first in the path, as first link has already been confirmed
-                self.D_Num_1 += 1
-                D_Time_1 = clock()
-                if link != listLinks[linkToCheck]:  # If link is not the one the list of space options was gotten from
-                    isFull = self.linkDict[link].CheckSpaceFull(startSlot, size, checkTime, holdT, checkProv)  # Check each possible space
-                    D_Time_1 = clock() - D_Time_1
-                    self.D_Avg_1 += D_Time_1
-                    if isFull:
-                        hasPath = False     # If the space is full in any link, move on to the next possible space
-                        break
-                    else:
-                        hasPath = True
+    def PopProvisions(self, pathProvisions, time):
+        reprovisionedResNum = []
+        tempProvResList     = []
+        provRes_Index       = []
 
-            if hasPath:             # If any possible space is empty on every link
-                return True, pathSpace   # return True and the index of the space
 
-        if hasPath: # If hasPath is somehow True at this point, raise an error
-            print("Oops, I did something wrong")
+        for resData in pathProvisions:  # Get a list of all unique resNum involved in this reprovisioning
+            if resData.resNum in reprovisionedResNum:   # If it exists in the list already, pass
+                continue
+            else:
+                reprovisionedResNum.append(resData.resNum)  # Else add it to the list
+
+        for resNum in reprovisionedResNum:
+            i = 0
+            for res in self.provisionedResList:
+                if res.resNum == resNum:
+                    provRes_Index.append(i)
+                    break
+                i += 1
+        if len(resprovisionedResNum) != len(provRes_Index):
+            print("Mismatched List Length")
             raise
 
-        return False, None
+        for index in provRes_Index:
+            tempProvResList.append(self.provisionedResList.pop(index))
 
-    def AllocateAcrossLinks(self, startIndex, offset, res, isProv):
-        startT      = res.GetStartT() + offset
+        return tempProvResList
+
+    def ClearProvAcrossLinks(self, res):
+        linkList = res.GetPath()
+        resID = res.resNum
+        for link in linkList:
+            self.linkDict[link].ClearProv(resID)
+
+    def CheckReprovision(self, res):
+        tempLinkDict    = {}
+        listLinks       = res.GetPath()
+        tempResCoords   = {}
+
+        minTime, maxTime, maxWindowSize, pathProvisions = self.GetReproWindow(res)
+        reprovResList = self.PopProvisions(pathProvisions)
+
+        for rpRes in reprovResList:
+            relevantLinks = rpRes.GetPath()
+            for link in relevantLinks:
+                if link in listLinks:
+                    continue
+                else:
+                    listLinks.append(link)
+        for link in listLinks:
+            tempLinkDict[link][0] = self.linkDict[link].GetWindowCopy(minTime, maxWindowSize)
+            tempLinkDict[link][1] = self.linkDict[link].GetProvisionList()
+
+        reprovResList.append(res)   # Probationally add res to list
+        reprovResList.sort(key=lambda rpRes: (rpRes.StartT, rpRes.resNum))
+
+        # Clear out all reservation spots in the tempWindows
+        for link in tempLinkDict:
+            for prov in tempLinkDict[link][1]:
+                provStartT  = prov.bStartT - minTime # Get base startT relative to earliest startT
+                provStartD  = prov.sSlot
+                provSize    = prov.nSlots
+                provDepth   = prov.holdingT
+                for i in range(provStartD, provDepth):
+                    for j in range(provStartT, provSize):
+                        if tempLinkDict[link][0][i][j] == PROV:
+                            tempLinkDict[link][0][i][j] = EMPTY
+                        else:
+                            raise
+        allResReprov = False
+        for rpRes in reprovResList:
+            listLinks   = rpRes.GetPath()
+            rpStartT    = rpRes.GetStartT()
+            rpSize      = rpRes.num_slots
+            rpDepth     = rpRes.holdingT
+            rpNum       = rpRes.resNum
+
+            windowBaseTime = 0  # The starting slot of the sliding window
+            if time > rpStartT: # If it is already past the reservations original start time, the window is smaller
+                windowBaseTime = time - rpStartT    # Base of window is first non-past time in window
+                                                    # Bound of window is startT + STRT_WNDW_RANGE
+            for windowSpace in range(windowBaseTime,STRT_WNDW_RANGE):
+                startT  = rpStartT + windowSpace - minTime
+                endT    = startT + rpDepth
+                spaceOptions = GetListOfOpenSpaces(tempLinkDict[link][0][startT:endT], rpSize)
+                spaceFound = False
+                for space in spaceOptions:
+                    for link in listLinks[1:]:
+                        if CheckAreaIsFull(tempLinkDict[link][0][startT:endT], space, rpSize):
+                            spaceFound = False
+                            break
+                        else:
+                            spaceFound = True
+                    if spaceFound == True:
+                        tempResCoords[rpNum] = [startT + minTime, space]    # Un-scale startT and record new coords
+                        break
+                    else:
+                        continue
+                if spaceFound:
+                    for link in listLinks:
+                        for i in range(startT, endT):
+                            for j in range(space, space+rpSize):
+                                if tempLinkDict[link][0][i][j] == EMPTY:
+                                    tempLinkDict[link][0][i][j] = PROV
+                                else:
+                                    raise
+                    break
+                else:
+                    continue
+            if spaceFound == True:
+                allResReprov = True
+            else:
+                allResReprov = False
+                break
+
+        if allResReprov:    # If all reservations could be reprovisioned without blocking
+            i                   = 0
+            numChanged          = 0
+            removedRes_Index    = []
+            for resID in tempResCoords:
+                for rpRes in reprovResList:
+                    if resID == rpRes.numRes:
+                        self.ClearProvAcrossLinks(rpRes)
+                        numChanged += 1
+                        rpTime  = tempResCoords[resID][0]
+                        rpSlot  = tempResCoords[resID][1]
+                        reprovResList[i].SetProvSpace(rpTime, rpSlot)
+                        if time == rpTime:
+                            self.AllocateAcrossLinks(rpSlot, rpTime, rpRes, False)
+                            self.completedRes += 1
+                            removedRes_Index.append(i)  # If res completes, record its index so not put back in self.provResList
+                        else:
+                            self.ProvisionAcrossLinks(rpRes, rpSlot, rpTime)
+                i += 1
+
+            if numChanged != len(tempResCoords):
+                print("Some unacknowledged res", len(tempResCoords), numChanged)
+                raise
+
+            removedRes_Index.sort(reverse=True)
+            for index in removedRes_Index:  # Remove any immediately starting (completed) reservations
+                reprovResList.pop(index)
+
+        else:               # If not all reservations could be reprovisioned without blocking
+            i = 0
+            for rpRes in reprovResList:
+                if rpRes.resNum == res.GetResNum():
+                    reprovResList.pop(i)
+                    break
+                i += 1
+        self.provisionedResList += reprovResList
+        self.provisionedResList.sort(key=lambda rpRes: (rpRes.start_t, rpRes.resNum))
+
+        #CHECK 1. Add res to reprov Res List
+        #2. Run simulation of possible reres
+        #3. If fail, block and remove res from rRL. If success, rewrite the startSlot and startTime of each res in rRL to its new space
+        #4. If success, clear and reprovision all res in rRL in all links (dont forget to edit link provision lists).
+        #5. Reappend reprovResList to self.provisionedResList.
+
+    def ProvisionAcrossLinks(self, res, startSlot, startDepth):
+        self.AllocateAcrossLinks(startSlot, startDepth, res, True)
+
+    def AllocProvAcrossLinks(self, res):
+        startSlot = res
+
+    def AllocateAcrossLinks(self, startSlot, startDepth, res, isProv):
+        startT      = startDepth
         size        = res.GetNumSlots()
         holdingT    = res.GetHoldingTime()
         links       = res.GetPath()
+        baseStartT  = res.GetStartT()
+        resNum      = res.GetResNum()
 
         for link in links:
             try:
-                if isProv:
-                    self.linkDict[link].AddToProvList(startIndex, startT, startIndex + size, startT + holdingT)
-                self.linkDict[link].PlaceRes(startIndex, size, holdingT, startT, isProv)
+                self.linkDict[link].PlaceRes(startSlot, size, holdingT, startT, isProv, resNum, baseStartT=baseStartT)
             except:
                 print("On link", link, "of links", links)
-                print("Error at", startT, startIndex, "of size", size, holdingT, "offset", offset)
+                print("Error at", startT, startSlot, "of size", size, holdingT, "offset")
+                print(isProv)
                 raise
 
     # ======================================= M a i n   F u n c t i o n ==========================================
@@ -383,158 +564,83 @@ class Network:
         print("Avg Slot Size", avgSS/numRes)
 
     def MainFunction(self, my_lambda, numRes, genRes = True, info = False):
-        # Reservations cannot be deleted in the middle of a list search, so their indexes are saved to be deleted after
+        allocated_Index             = []
         arrivedOrIBlocked_Index     = []
-        completeOrPBlocked_Index    = []
-        DEBUG_CIPO1_Avg     = 0
-        DEBUG_CIPO1_Num     = 0
-        DEBUG_Init_Avg      = 0
-        DEBUG_Init_Num      = 0
-        DEBUG_Arri_Avg      = 0
-        DEBUG_Arri_Num      = 0
-        DEBUG_Check_Avg     = 0
-        DEBUG_Check_Num     = 0
-        DEBUG_HasP_Avg      = 0
-        DEBUG_HasP_Num      = 0
-        DEBUG_NoP_Avg       = 0
-        DEBUG_NoP_Num       = 0
-        DEBUG_SC1_Avg       = 0
-        DEBUG_SC1_Num       = 0
-        DEBUG_SC2_Avg       = 0
-        DEBUG_SC2_Num       = 0
 
-        DEBUG_Total_Time    = clock()
+        DEBUG_Total_Time = clock()
 
-        DEBUG_CrMult_Avg    = clock()
         if genRes:
             self.CreateMultRes(my_lambda, numRes)
         else:
             numRes = len(self.initialResList)
         self.SortInitResByArrivalT()
-        DEBUG_CrMult_Avg    = clock() - DEBUG_CrMult_Avg
+
         maxTime = self.initialResList[-1].GetStartT() + 100 + STRT_WNDW_RANGE
-
         for time in range(0, maxTime):
-
-            newResArrived   =   False   # Each time, t, set newResArrived to false; check if need to re-sort arrivedResList
-            arrivedOrIBlocked_Index.clear()
-
-
-            DEBUG_Init_Num += 1
-            DEBUG_Init_Time = clock()
-            for res in self.initialResList:
-                i = 0
-                if res.arrival_t == time:   # If the Res arrives at this time
-
-                    for offset in range(0, STRT_WNDW_RANGE):
-
-                        DEBUG_CIPO1_Num += 1
-                        DEBUG_CIPO1_Time = clock()
-                        hasPath, pathSpace = self.CheckInitialPathOpen(res, offset, False) # Check to see if there is an opening
-                        DEBUG_CIPO1_Time    = clock() - DEBUG_CIPO1_Time
-                        DEBUG_CIPO1_Avg     += DEBUG_CIPO1_Time
-
-                        if hasPath:
-                            break
-
-                    DEBUG_Check_Num     += 1
-                    DEBUG_Check_Time    = clock()
-                    # Start of possible reprovision stage
-                    if hasPath == False:
-                        for offset in range(0, STRT_WNDW_RANGE):
-                            hasPath, pathSpace = self.CheckInitialPathOpen(res, offset, True)
-                            if hasPath:
-                                break
-
-                    if hasPath:
-                        DEBUG_HasP_Num += 1
-                        DEBUG_HasP_Time = clock()
-                        res.ProvisionSpace(pathSpace, offset)
-                        self.arrivingResList.append(res)
-                        arrivedOrIBlocked_Index.append(i) # Queue the res for deletion
-                        newResArrived = True    # Set to true if any new res arrive
-                        DEBUG_HasP_Time = clock() - DEBUG_HasP_Time
-                        DEBUG_HasP_Avg += DEBUG_HasP_Time
-                        self.AllocateAcrossLinks(pathSpace, offset, res, True)
-                    else:
-                        DEBUG_NoP_Num += 1
-                        DEBUG_NoP_Time = clock()
-                        self.immediateBlocking += 1
-                        arrivedOrIBlocked_Index.append(i) # Queue the res for deletion
-                        DEBUG_NoP_Time = clock() - DEBUG_NoP_Time
-                        DEBUG_NoP_Avg += DEBUG_NoP_Time
-
-                    DEBUG_Check_Time    = clock() - DEBUG_Check_Time
-                    DEBUG_Check_Avg     += DEBUG_Check_Time
-                elif res.arrival_t < time:
+            print("Time", time)
+            i = 0
+            allocated_Index.clear()
+            # ============= A L L O C A T I O N   L O O P ================
+            for res in self.provisionedResList:
+                provStartT  = res.GetProvTime()
+                provStartS  = res.GetProvSlot()
+                if provStartT == time:
+                    print("Allocating res", res.GetResNum())
+                    self.ClearProvAcrossLinks(res)
+                    self.AllocateAcrossLinks(provStartS, provStartT, res, False)
+                    self.completedRes += 1
+                    allocated_Index.append(i)
+                elif res.GetProvTime() == None or res.GetProvSlot() == None:
                     raise
-                else:
-                    break   # As the lsit is ordered by time: if any do not match, move on to the next step; Checking arrived res
                 i += 1
 
+            # Sort indexes from high to low as deleting and index reindexes earlier entries
+            allocated_Index.sort(reverse=True)
+            for index in allocated_Index:
+                self.provisionedResList.pop(index)
 
-            DEBUG_Init_Time = clock() - DEBUG_Init_Time
-            DEBUG_Init_Avg += DEBUG_Init_Time
-
-            DEBUG_SC1_Num += 1
-            DEBUG_SC1_Time = clock()
-            # Clear out res that arrive or immediately block
-            arrivedOrIBlocked_Index.sort(reverse=True) # Sort indexes from low to high as deleting reindexes later entries
+            arrivedOrIBlocked_Index.clear()
+            i = 0
+            wasProvisioned = False
+            for res in self.initialResList:
+                if res.arrival_t == time:
+                    print("Provisioning res", res.GetResNum())
+                    hasSpace, spaceSlot, spaceTime = self.FindContinuousSpace(res)
+                    if hasSpace and spaceTime > time:
+                        res.SetProvSpace(spaceTime, spaceSlot)
+                        self.ProvisionAcrossLinks(res, spaceSlot, spaceTime)
+                        self.provisionedResList.append(res)
+                        wasProvisioned = True
+                        arrivedOrIBlocked_Index.append(i)
+                    elif hasSpace and spaceTime == time:
+                        self.AllocateAcrossLinks(spaceSlot, spaceTime, res, False)
+                        self.completedRes += 1
+                        arrivedOrIBlocked_Index.append(i)
+                    elif hasSpace and spaceTime < time:
+                        print("ERROR: Invalid time")
+                    else:
+                        wasReprovisioned = self.CheckReprovision(res)
+                        if wasReprovisioned == False:
+                            self.immediateBlocking += 1
+                            arrivedOrIBlocked_Index.append(i)
+                        else:
+                            print("Reprovisioning for res", res.GetResNum())
+                            wasProvisioned = True
+                            self.provisionedResList.append(res)
+                i += 1
+            # Sort indexes from high to low as deleting and index reindexes earlier entries
+            arrivedOrIBlocked_Index.sort(reverse=True)
             for index in arrivedOrIBlocked_Index:
                 self.initialResList.pop(index)
+            if wasProvisioned:
+                self.provisionedResList.sort(key=lambda res: (res.provTime, res.resNum))
 
-            completeOrPBlocked_Index.clear()
-            if newResArrived:   # If any new reservations have arrived
-                self.SortArrivingResByStartT()  # Sort arriving res list if new res have arrived
-
-            DEBUG_SC1_Time = clock() - DEBUG_SC1_Time
-            DEBUG_SC1_Avg   += DEBUG_SC1_Time
-
-            DEBUG_Arri_Num += 1
-            DEBUG_Arri_Time = clock()
-            for res in self.arrivingResList:
-                i = 0
-                if res.GetStartT() == time:
-                    hasPath = False
-                    for offset in range(0, STRT_WNDW_RANGE):
-                        timeOffset = offset
-                        hasPath, pathSpace = self.CheckInitialPathOpen(res, offset, False)  # Check to see if there is an opening
-                        if hasPath:
-
-                            break
-                    if hasPath:
-                        try:
-                            self.AllocateAcrossLinks(pathSpace, timeOffset, res)
-                        except:
-                            print(hasPath, pathSpace, timeOffset, res.start_t)
-                            raise
-                        completeOrPBlocked_Index.append(i)
-                        self.completedRes += 1
-                    else:
-                        self.promisedBlocking += 1
-                        completeOrPBlocked_Index.append(i)
-                        #if offset == 9:
-                        #    for link in res.path:
-                        #        self.PrintGraphics(link, res.start_t + offset + res.holding_t)
-                        #    print(res.start_t, res.num_slots, res.holding_t)
-                        #    raise
-                else:
-                    break   # As the lsit is ordered by time: if any do not match, move on to the next step
-                i += 1
-
-            DEBUG_SC2_Num += 1
-            DEBUG_SC2_Time = clock()
-
-            # Clear out res that complete or promise block
-            completeOrPBlocked_Index.sort(reverse=True)  # Sort indexes from low to high as deleting reindexes later entries
-            for index in completeOrPBlocked_Index:
-                self.arrivingResList.pop(index)
-
-            DEBUG_SC2_Time = clock() - DEBUG_SC2_Time
-            DEBUG_SC2_Avg += DEBUG_SC2_Time
-
-            DEBUG_Arri_Time = clock() - DEBUG_Arri_Time
-            DEBUG_Arri_Avg += DEBUG_Arri_Time
+            print("A-Res-List:")
+            for res in self.provisionedResList:
+                print(res.GetResNum())
+            print("P-Res-List:")
+            for res in self.initialResList:
+                print(res.GetResNum())
 
 
         localBlocking = self.immediateBlocking  # Get number of local blocks
@@ -551,21 +657,6 @@ class Network:
             print(len(self.initialResList), len(self.arrivingResList))
             raise NetworkError
         DEBUG_Total_Time = clock() - DEBUG_Total_Time
-
-        if(False):
-            print("DEBUG_CIPO1 Average", DEBUG_CIPO1_Avg/DEBUG_CIPO1_Num, "Total", DEBUG_CIPO1_Avg)
-            print("DEBUG_Check Average", DEBUG_Check_Avg/DEBUG_Check_Num, "Total", DEBUG_Check_Avg)
-            print("DEBUG_Init Average", DEBUG_Init_Avg / DEBUG_Init_Num, "Total", DEBUG_Init_Avg)
-            print("DEBUG_Arri Average", DEBUG_Arri_Avg / DEBUG_Arri_Num, "Total", DEBUG_Arri_Avg)
-            print("DEBUG_HasPath Average", DEBUG_HasP_Avg / DEBUG_HasP_Num, "Total", DEBUG_HasP_Avg)
-            print("DEBUG_HasNoPath Average", DEBUG_NoP_Avg / DEBUG_NoP_Num, "Total", DEBUG_NoP_Avg)
-            print("DEBUG Continuous Open", self.D_Avg_1/ self.D_Num_1, "Total", self.D_Avg_1)
-            print("DEBUG Get List of Open", self.D_Avg_2/ self.D_Num_2, "Total", self.D_Avg_2)
-            print("DEBUG Create Reservations", DEBUG_CrMult_Avg)
-            print("DEBUG Sort/Clear 1 Average", DEBUG_SC1_Avg/DEBUG_SC1_Num, "Total", DEBUG_SC1_Avg)
-            print("DEBUG Sort/Clear 2 Average", DEBUG_SC2_Avg/DEBUG_SC2_Num, "Total", DEBUG_SC2_Avg)
-            print("Total Time", DEBUG_Total_Time)
-#        return(self.completedRes, localBlocking, linkBlocking, totalBlocking)
 
         return self.completedRes, localBlocking, linkBlocking, DEBUG_Total_Time
 
