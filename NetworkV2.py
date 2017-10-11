@@ -272,7 +272,7 @@ class Network:
         listLinks       = res.GetPath()
         baseStartT      = res.GetStartT()
 
-        holdT           = res.GetHoldingTime()
+        holdT           = res.GetHoldingT()
 
         for offset in range(0, STRT_WNDW_RANGE):
             checkTime = baseStartT + offset
@@ -339,7 +339,7 @@ class Network:
 
         return minTime, maxTime, maxWindowSize, pathProvisions
 
-    def PopProvisions(self, pathProvisions, time):
+    def PopProvisions(self, pathProvisions):
         reprovisionedResNum = []
         tempProvResList     = []
         provRes_Index       = []
@@ -358,7 +358,7 @@ class Network:
                     provRes_Index.append(i)
                     break
                 i += 1
-        if len(resprovisionedResNum) != len(provRes_Index):
+        if len(reprovisionedResNum) != len(provRes_Index):
             print("Mismatched List Length")
             raise
 
@@ -373,10 +373,11 @@ class Network:
         for link in linkList:
             self.linkDict[link].ClearProv(resID)
 
-    def CheckReprovision(self, res):
+    def CheckReprovision(self, res, time):
         tempLinkDict    = {}
         listLinks       = res.GetPath()
         tempResCoords   = {}
+        newReprovResList = []
 
         minTime, maxTime, maxWindowSize, pathProvisions = self.GetReproWindow(res)
         reprovResList = self.PopProvisions(pathProvisions)
@@ -389,11 +390,12 @@ class Network:
                 else:
                     listLinks.append(link)
         for link in listLinks:
+            tempLinkDict[link]    = [None,None]
             tempLinkDict[link][0] = self.linkDict[link].GetWindowCopy(minTime, maxWindowSize)
             tempLinkDict[link][1] = self.linkDict[link].GetProvisionList()
 
         reprovResList.append(res)   # Probationally add res to list
-        reprovResList.sort(key=lambda rpRes: (rpRes.StartT, rpRes.resNum))
+        reprovResList.sort(key=lambda rpRes: (rpRes.start_t, rpRes.resNum))
 
         # Clear out all reservation spots in the tempWindows
         for link in tempLinkDict:
@@ -413,9 +415,8 @@ class Network:
             listLinks   = rpRes.GetPath()
             rpStartT    = rpRes.GetStartT()
             rpSize      = rpRes.num_slots
-            rpDepth     = rpRes.holdingT
+            rpDepth     = rpRes.GetHoldingT()
             rpNum       = rpRes.resNum
-
             windowBaseTime = 0  # The starting slot of the sliding window
             if time > rpStartT: # If it is already past the reservations original start time, the window is smaller
                 windowBaseTime = time - rpStartT    # Base of window is first non-past time in window
@@ -425,6 +426,8 @@ class Network:
                 endT    = startT + rpDepth
                 spaceOptions = GetListOfOpenSpaces(tempLinkDict[link][0][startT:endT], rpSize)
                 spaceFound = False
+                if len(listLinks) == 1:
+                    spaceFound = True
                 for space in spaceOptions:
                     for link in listLinks[1:]:
                         if CheckAreaIsFull(tempLinkDict[link][0][startT:endT], space, rpSize):
@@ -447,32 +450,61 @@ class Network:
                                     raise
                     break
                 else:
+                    print("COULD NOT FIND", rpNum)
+                    if rpNum == res.resNum:
+                        for line in tempLinkDict['AB'][0]:
+                            for column in line:
+                                if column == EMPTY:
+                                    print('-', end='')
+                                elif column == FULL or column == START:
+                                    print('X', end='')
+                                elif column == PROV:
+                                    print('P', end='')
+                                else:
+                                    raise
+                            print()
+                        raise
+                    print("res resnum", res.resNum, "resNum rpNum", rpNum)
                     continue
             if spaceFound == True:
                 allResReprov = True
             else:
+                if rpNum == res.resNum:
+                    for line in tempLinkDict['AB'][0]:
+                        for column in line:
+                            if column == EMPTY:
+                                print('-', end='')
+                            elif column == FULL or column == START:
+                                print('X', end='')
+                            elif column == PROV:
+                                print('P', end='')
+                            else:
+                                raise
+                        print()
+                    raise
                 allResReprov = False
                 break
 
         if allResReprov:    # If all reservations could be reprovisioned without blocking
-            i                   = 0
             numChanged          = 0
             removedRes_Index    = []
             for resID in tempResCoords:
-                for rpRes in reprovResList:
-                    if resID == rpRes.numRes:
-                        self.ClearProvAcrossLinks(rpRes)
+                for rpRes in range(len(reprovResList)):
+                    if resID == reprovResList[rpRes].GetResNum():
+                        self.ClearProvAcrossLinks(reprovResList[rpRes])
                         numChanged += 1
                         rpTime  = tempResCoords[resID][0]
                         rpSlot  = tempResCoords[resID][1]
-                        reprovResList[i].SetProvSpace(rpTime, rpSlot)
+                        reprovResList[rpRes].SetProvSpace(rpTime, rpSlot)
+                        if reprovResList[rpRes].GetProvTime() != rpTime or reprovResList[rpRes].GetProvSlot() != rpSlot:
+                            raise
                         if time == rpTime:
-                            self.AllocateAcrossLinks(rpSlot, rpTime, rpRes, False)
+                            self.AllocateAcrossLinks(rpSlot, rpTime, reprovResList[rpRes], False)
                             self.completedRes += 1
-                            removedRes_Index.append(i)  # If res completes, record its index so not put back in self.provResList
+                            removedRes_Index.append(rpRes)  # If res completes, record its index so not put back in self.provResList
+                            print("Prov starting now", resID)
                         else:
-                            self.ProvisionAcrossLinks(rpRes, rpSlot, rpTime)
-                i += 1
+                            self.ProvisionAcrossLinks(reprovResList[rpRes], rpSlot, rpTime)
 
             if numChanged != len(tempResCoords):
                 print("Some unacknowledged res", len(tempResCoords), numChanged)
@@ -482,15 +514,21 @@ class Network:
             for index in removedRes_Index:  # Remove any immediately starting (completed) reservations
                 reprovResList.pop(index)
 
+            for prov in reprovResList:
+                if prov.provTime == None or prov.provSlot == None:
+                    raise
+                print("Res", prov.resNum, prov.provTime, prov.provSlot)
         else:               # If not all reservations could be reprovisioned without blocking
-            i = 0
-            for rpRes in reprovResList:
-                if rpRes.resNum == res.GetResNum():
-                    reprovResList.pop(i)
+            for rpRes in range(len(reprovResList)):
+                if reprovResList[rpRes].resNum == res.GetResNum():
+                    reprovResList.pop(rpRes)
                     break
-                i += 1
         self.provisionedResList += reprovResList
         self.provisionedResList.sort(key=lambda rpRes: (rpRes.start_t, rpRes.resNum))
+        if allResReprov == True:
+            return True
+        else:
+            return False
 
         #CHECK 1. Add res to reprov Res List
         #2. Run simulation of possible reres
@@ -507,7 +545,7 @@ class Network:
     def AllocateAcrossLinks(self, startSlot, startDepth, res, isProv):
         startT      = startDepth
         size        = res.GetNumSlots()
-        holdingT    = res.GetHoldingTime()
+        holdingT    = res.GetHoldingT()
         links       = res.GetPath()
         baseStartT  = res.GetStartT()
         resNum      = res.GetResNum()
@@ -518,7 +556,7 @@ class Network:
             except:
                 print("On link", link, "of links", links)
                 print("Error at", startT, startSlot, "of size", size, holdingT, "offset")
-                print(isProv)
+                print("res", res.GetResNum())
                 raise
 
     # ======================================= M a i n   F u n c t i o n ==========================================
@@ -577,7 +615,6 @@ class Network:
 
         maxTime = self.initialResList[-1].GetStartT() + 100 + STRT_WNDW_RANGE
         for time in range(0, maxTime):
-            print("Time", time)
             i = 0
             allocated_Index.clear()
             # ============= A L L O C A T I O N   L O O P ================
@@ -585,9 +622,13 @@ class Network:
                 provStartT  = res.GetProvTime()
                 provStartS  = res.GetProvSlot()
                 if provStartT == time:
-                    print("Allocating res", res.GetResNum())
                     self.ClearProvAcrossLinks(res)
-                    self.AllocateAcrossLinks(provStartS, provStartT, res, False)
+                    try:
+                        self.AllocateAcrossLinks(provStartS, provStartT, res, False)
+                    except RuntimeError:
+                        print("Error with res", res.resNum)
+                        print("Res intended for ", res.GetProvSlot(), res.GetProvTime())
+                        raise
                     self.completedRes += 1
                     allocated_Index.append(i)
                 elif res.GetProvTime() == None or res.GetProvSlot() == None:
@@ -600,48 +641,48 @@ class Network:
                 self.provisionedResList.pop(index)
 
             arrivedOrIBlocked_Index.clear()
+            # ---------- E N D   A L L O C A T I O N   L O O P -----------
+            # =============== P R O V I S I O N   L O O P ================
             i = 0
             wasProvisioned = False
             for res in self.initialResList:
                 if res.arrival_t == time:
-                    print("Provisioning res", res.GetResNum())
                     hasSpace, spaceSlot, spaceTime = self.FindContinuousSpace(res)
                     if hasSpace and spaceTime > time:
                         res.SetProvSpace(spaceTime, spaceSlot)
+                        if (res.GetProvTime() == None or res.GetProvSlot() == None):
+                            print(res.GetProvTime(), res.GetProvSlot())
+                            raise
                         self.ProvisionAcrossLinks(res, spaceSlot, spaceTime)
                         self.provisionedResList.append(res)
                         wasProvisioned = True
-                        arrivedOrIBlocked_Index.append(i)
                     elif hasSpace and spaceTime == time:
                         self.AllocateAcrossLinks(spaceSlot, spaceTime, res, False)
                         self.completedRes += 1
-                        arrivedOrIBlocked_Index.append(i)
                     elif hasSpace and spaceTime < time:
                         print("ERROR: Invalid time")
+                        raise
                     else:
-                        wasReprovisioned = self.CheckReprovision(res)
+                        wasReprovisioned = self.CheckReprovision(res, time)
                         if wasReprovisioned == False:
                             self.immediateBlocking += 1
-                            arrivedOrIBlocked_Index.append(i)
-                        else:
-                            print("Reprovisioning for res", res.GetResNum())
-                            wasProvisioned = True
-                            self.provisionedResList.append(res)
+
+                    arrivedOrIBlocked_Index.append(i)
                 i += 1
             # Sort indexes from high to low as deleting and index reindexes earlier entries
             arrivedOrIBlocked_Index.sort(reverse=True)
             for index in arrivedOrIBlocked_Index:
                 self.initialResList.pop(index)
             if wasProvisioned:
-                self.provisionedResList.sort(key=lambda res: (res.provTime, res.resNum))
+                try:
+                    self.provisionedResList.sort(key=lambda res: (res.provTime, res.resNum))
+                except TypeError:
+                    for prov in self.provisionedResList:
+                        print("Prov", prov.resNum, prov.provTime, prov.provSlot)
+                        print(wasReprovisioned)
+                    raise
 
-            print("A-Res-List:")
-            for res in self.provisionedResList:
-                print(res.GetResNum())
-            print("P-Res-List:")
-            for res in self.initialResList:
-                print(res.GetResNum())
-
+            # ============ E N D   P R O V I S I O N   L O O P =============
 
         localBlocking = self.immediateBlocking  # Get number of local blocks
         linkBlocking = self.promisedBlocking
@@ -725,7 +766,7 @@ def TestingRun( ResList):
             else:
                 listOfInvolvedLinks.append(link)
         i += 1
-    test.PrintInitialResList()
+    #test.PrintInitialResList()
     test.MainFunction(None, None, genRes=False)
 
     for link in listOfInvolvedLinks:

@@ -1,4 +1,4 @@
-MAX_NUM_FREQ    = 128
+MAX_NUM_FREQ    = 6
 TIME_WNDW_SIZE  = 5000       # Initial time window size
 MAX_SLOT_SIZE   = 12.5
 MAX_REQ_SIZE    = 200
@@ -71,7 +71,7 @@ TestResList = [
     ['AB', 1, 1, 5, 2],
     ['AB', 2, 5, 3, 2],
     ['AB', 3, 3, 4, 2],
-    ['AB', 4, 7, 3, 2],
+    ['AB', 4, 7, 4, 2],
     ['AB', 5, 6, 3, 2],
 ]
 

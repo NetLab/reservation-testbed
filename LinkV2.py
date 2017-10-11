@@ -99,7 +99,8 @@ class Link:
                             self.timeWindow[startDepth + i][startSlot + j] = PROV
                     numSlotsFilled += 1
                 elif curSlot == PROV:
-                    print("Error: PlaceRes, no provisioned slots should exist at this point")
+                    print("Error: PlaceRes, no provisioned slots should exist at this point: time,", startDepth, startSlot + j, startDepth + i)
+                    self.PrintGraphic(startDepth + depth + 3)
                     raise
                 elif self.timeWindow[startDepth + i][startSlot + j] == FULL or self.timeWindow[startDepth + i][startSlot + j] == START:
                     print("LINK", self.nodes)

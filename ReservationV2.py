@@ -66,7 +66,7 @@ class Reservation:
 
     # =========================== G e n e r a t i o n ==============================
 
-    def GetArrivalTime(self):
+    def GetArrivalT(self):
         return self.arrival_t
 
     def GenArrivalTime(self, my_lambda):
@@ -74,7 +74,7 @@ class Reservation:
         randNum = random.uniform(0.0000000000000001, 1)
         return round((-1 * log(randNum))/my_lambda)
 
-    def GetHoldingTime(self):
+    def GetHoldingT(self):
         return self.holding_t
 
     def GenHoldingTime(self):
