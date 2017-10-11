@@ -321,8 +321,10 @@ class Network:
         for link in linkList:
             pathProvisions += self.linkDict[link].GetProvisionList()
         pathProvisions.sort(key=lambda prov: (prov.bStartT, prov.resNum))
-
-        minTime         = pathProvisions[0].bStartT
+        if len(pathProvisions) > 0:
+            minTime         = pathProvisions[0].bStartT
+        else:
+            minTime = 0
         # Default maxTime is the max time the res can go to
         maxTime         = res.GetStartT() + res.GetHoldingT() # Time after which reservations may not be considered.
         maxWindowSize   = maxTime + STRT_WNDW_RANGE # Maximum depth of time window needed to reprovision
@@ -426,20 +428,23 @@ class Network:
                 endT    = startT + rpDepth
                 spaceOptions = GetListOfOpenSpaces(tempLinkDict[link][0][startT:endT], rpSize)
                 spaceFound = False
-                if len(listLinks) == 1:
+                if len(listLinks) == 1 and len(spaceOptions) > 0:
                     spaceFound = True
-                for space in spaceOptions:
-                    for link in listLinks[1:]:
-                        if CheckAreaIsFull(tempLinkDict[link][0][startT:endT], space, rpSize):
-                            spaceFound = False
+                    space = spaceOptions[0]
+                    tempResCoords[rpNum] = [startT + minTime, space]
+                else:
+                    for space in spaceOptions:
+                        for link in listLinks[1:]:
+                            if CheckAreaIsFull(tempLinkDict[link][0][startT:endT], space, rpSize):
+                                spaceFound = False
+                                break
+                            else:
+                                spaceFound = True
+                        if spaceFound == True:
+                            tempResCoords[rpNum] = [startT + minTime, space]    # Un-scale startT and record new coords
                             break
                         else:
-                            spaceFound = True
-                    if spaceFound == True:
-                        tempResCoords[rpNum] = [startT + minTime, space]    # Un-scale startT and record new coords
-                        break
-                    else:
-                        continue
+                            continue
                 if spaceFound:
                     for link in listLinks:
                         for i in range(startT, endT):
@@ -448,41 +453,11 @@ class Network:
                                     tempLinkDict[link][0][i][j] = PROV
                                 else:
                                     raise
+                    allResReprov = True
                     break
                 else:
-                    print("COULD NOT FIND", rpNum)
-                    if rpNum == res.resNum:
-                        for line in tempLinkDict['AB'][0]:
-                            for column in line:
-                                if column == EMPTY:
-                                    print('-', end='')
-                                elif column == FULL or column == START:
-                                    print('X', end='')
-                                elif column == PROV:
-                                    print('P', end='')
-                                else:
-                                    raise
-                            print()
-                        raise
-                    print("res resnum", res.resNum, "resNum rpNum", rpNum)
-                    continue
-            if spaceFound == True:
-                allResReprov = True
-            else:
-                if rpNum == res.resNum:
-                    for line in tempLinkDict['AB'][0]:
-                        for column in line:
-                            if column == EMPTY:
-                                print('-', end='')
-                            elif column == FULL or column == START:
-                                print('X', end='')
-                            elif column == PROV:
-                                print('P', end='')
-                            else:
-                                raise
-                        print()
-                    raise
-                allResReprov = False
+                    allResReprov = False
+            if allResReprov == False:
                 break
 
         if allResReprov:    # If all reservations could be reprovisioned without blocking

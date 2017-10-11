@@ -13,9 +13,9 @@ AVAIL_SLOTS_INDEX   = 0     # Index of available slots is the last index in the 
 TIME_WINDOW_INDEX   = 1     # index of actual implementation of time window
 
 NumNodes        = 14
-NumRes          = 50000
+NumRes          = 10000
 NumTrials       = 1
-NumLambdas      = 38
+NumLambdas      = 1
 
 guard_band      = 1
 Mu              = 0.05

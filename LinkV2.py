@@ -41,23 +41,8 @@ class Link:
             self.availSlots += newAvail
 
     # For checking if a space exists starting from a current start slot
-    def CheckSpaceFull(self, startSlot, size, startT, depth, checkProv):
-
-#        for row in self.availSlots[startT:startT+depth]:
-#            if row < size:
-#                return True
-
-        # for row in range(0, depth):
-        #     for space in range(0, size):
-        #         curSlot = self.timeWindow[startT + row][startSlot + space]
-        #         if curSlot != EMPTY:
-        #             return True
-        #         elif curSlot == EMPTY:
-        #             continue
-        #         else:
-        #             raise
-
-        return CheckAreaIsFull(self.timeWindow[startT:startT+depth], startSlot, size, checkProv)
+    def CheckSpaceFull(self, startSlot, size, startT, depth):
+        return CheckAreaIsFull(self.timeWindow[startT:startT+depth], startSlot, size)
 
 
     def GetTimeAvailSlots(self, startT, depth):
@@ -244,14 +229,11 @@ def CheckLineIsFull(window, slot):
             continue
     return False
 
-def CheckAreaIsFull(window, startSlot, size, checkProv):
+def CheckAreaIsFull(window, startSlot, size):
     for row in window:
         for column in range(startSlot, startSlot + size):
             if row[column] != EMPTY:
-                if checkProv == True and row[column] == PROV:
-                    continue
-                else:
-                    return True
+                return True
             else:
                 continue
     return False
