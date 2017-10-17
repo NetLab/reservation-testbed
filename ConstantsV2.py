@@ -1,4 +1,4 @@
-MAX_NUM_FREQ    = 6
+MAX_NUM_FREQ    = 128
 TIME_WNDW_SIZE  = 5000       # Initial time window size
 MAX_SLOT_SIZE   = 12.5
 MAX_REQ_SIZE    = 200

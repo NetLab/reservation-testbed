@@ -323,6 +323,9 @@ class Network:
         pathProvisions.sort(key=lambda prov: (prov.bStartT, prov.resNum))
         if len(pathProvisions) > 0:
             minTime         = pathProvisions[0].bStartT
+            minWindowSize   = minTime
+            if res.GetStartT() < minTime:
+                minWindowSize = res.GetStartT()
         else:
             minTime = 0
         # Default maxTime is the max time the res can go to
@@ -339,7 +342,7 @@ class Network:
         for prov_Index in provNotConsidered_Index:
             pathProvisions.pop(prov_Index)  # Remove each index
 
-        return minTime, maxTime, maxWindowSize, pathProvisions
+        return minTime, minWindowSize, maxTime, maxWindowSize, pathProvisions
 
     def PopProvisions(self, pathProvisions):
         reprovisionedResNum = []
@@ -354,18 +357,25 @@ class Network:
                 reprovisionedResNum.append(resData.resNum)  # Else add it to the list
 
         for resNum in reprovisionedResNum:
-            i = 0
-            for res in self.provisionedResList:
-                if res.resNum == resNum:
+            for i in range(len(self.provisionedResList)):
+                if self.provisionedResList[i].resNum == resNum:
                     provRes_Index.append(i)
                     break
-                i += 1
+
+        provRes_Index.sort(reverse=True)
+
         if len(reprovisionedResNum) != len(provRes_Index):
             print("Mismatched List Length")
             raise
 
         for index in provRes_Index:
-            tempProvResList.append(self.provisionedResList.pop(index))
+            try:
+                tempProvResList.append(self.provisionedResList.pop(index))
+            except IndexError:
+                print(index, len(self.provisionedResList))
+                for index_debug in provRes_Index:
+                    print(index_debug, ' ', end='')
+                raise
 
         return tempProvResList
 
@@ -381,7 +391,7 @@ class Network:
         tempResCoords   = {}
         newReprovResList = []
 
-        minTime, maxTime, maxWindowSize, pathProvisions = self.GetReproWindow(res)
+        minTime, minWindowSize, maxTime, maxWindowSize, pathProvisions = self.GetReproWindow(res)
         reprovResList = self.PopProvisions(pathProvisions)
 
         for rpRes in reprovResList:
@@ -393,26 +403,49 @@ class Network:
                     listLinks.append(link)
         for link in listLinks:
             tempLinkDict[link]    = [None,None]
-            tempLinkDict[link][0] = self.linkDict[link].GetWindowCopy(minTime, maxWindowSize)
+            tempLinkDict[link][0] = self.linkDict[link].GetWindowCopy(minWindowSize, maxWindowSize)
             tempLinkDict[link][1] = self.linkDict[link].GetProvisionList()
 
         reprovResList.append(res)   # Probationally add res to list
         reprovResList.sort(key=lambda rpRes: (rpRes.start_t, rpRes.resNum))
 
         # Clear out all reservation spots in the tempWindows
-        for link in tempLinkDict:
-            for prov in tempLinkDict[link][1]:
-                provStartT  = prov.bStartT - minTime # Get base startT relative to earliest startT
-                provStartD  = prov.sSlot
+        # for link in res.GetPath():
+        #     print("LINK", link)
+        #     PrintGraphic(tempLinkDict[link][0], 0, len(tempLinkDict[link][0]))
+        for link in tempLinkDict.keys():
+            for provIndex in range(len(tempLinkDict[link][1])):
+                prov = tempLinkDict[link][1][provIndex]
+                provStartD  = prov.rStartT - minTime # Get base startT relative to earliest startT
+                provStartS  = prov.sSlot
                 provSize    = prov.nSlots
                 provDepth   = prov.holdingT
                 for i in range(provStartD, provDepth):
-                    for j in range(provStartT, provSize):
-                        if tempLinkDict[link][0][i][j] == PROV:
-                            tempLinkDict[link][0][i][j] = EMPTY
-                        else:
+                    for j in range(provStartS, provSize):
+                        try:
+                            if tempLinkDict[link][0][i][j] == PROV:
+                                tempLinkDict[link][0][i][j] = EMPTY
+                            else:
+                                PrintGraphic(tempLinkDict[link][0], 0, -1)
+                                print(i+minTime,j, provSize)
+                                print("From ", provStartD, "to", provDepth, "and", provStartS, "to", provSize)
+                                print(tempLinkDict[link][0][i][j] )
+                                print("Max window size", maxWindowSize)
+                                raise
+                        except IndexError:  # DEBUG, REMOVE
+                            print(i, j)
+                            print("From ", provStartD, "to", provDepth, "and", provStartS, "to", provSize)
+                            print("With window from", minTime, "to", maxWindowSize)
+                            print(len(tempLinkDict[link][0]))
+                            print(len(tempLinkDict[link][0][i]))
+                            print(len(tempLinkDict[link][0][i][j]))
                             raise
+        # for link in res.GetPath():
+        #     print("RE-LINK", link)
+        #     PrintGraphic(tempLinkDict[link][0], 0, len(tempLinkDict[link][0]))
+        # raise
         allResReprov = False
+        #   Use temporary window to find possible rearrangement of provisions
         for rpRes in reprovResList:
             listLinks   = rpRes.GetPath()
             rpStartT    = rpRes.GetStartT()
@@ -421,9 +454,10 @@ class Network:
             rpNum       = rpRes.resNum
             windowBaseTime = 0  # The starting slot of the sliding window
             if time > rpStartT: # If it is already past the reservations original start time, the window is smaller
-                windowBaseTime = time - rpStartT    # Base of window is first non-past time in window
-                                                    # Bound of window is startT + STRT_WNDW_RANGE
-            for windowSpace in range(windowBaseTime,STRT_WNDW_RANGE):
+                windowBaseTime = time - rpStartT        # Base of window is first non-past time in window
+                if windowBaseTime >= STRT_WNDW_RANGE:   # Bound of window is startT + STRT_WNDW_RANGE
+                    raise
+            for windowSpace in range(windowBaseTime, STRT_WNDW_RANGE):
                 startT  = rpStartT + windowSpace - minTime
                 endT    = startT + rpDepth
                 spaceOptions = GetListOfOpenSpaces(tempLinkDict[link][0][startT:endT], rpSize)
@@ -446,12 +480,17 @@ class Network:
                         else:
                             continue
                 if spaceFound:
-                    for link in listLinks:
+                    for link in range(len(listLinks)):
                         for i in range(startT, endT):
                             for j in range(space, space+rpSize):
                                 if tempLinkDict[link][0][i][j] == EMPTY:
                                     tempLinkDict[link][0][i][j] = PROV
                                 else:
+                                    print(i, j)
+                                    errorStartT = startT - 10
+                                    if errorStartT < 0:
+                                        errorStartT = 0
+                                    PrintGraphic(tempLinkDict[link][0], errorStartT, endT)
                                     raise
                     allResReprov = True
                     break
@@ -618,13 +657,13 @@ class Network:
             arrivedOrIBlocked_Index.clear()
             # ---------- E N D   A L L O C A T I O N   L O O P -----------
             # =============== P R O V I S I O N   L O O P ================
-            i = 0
             wasProvisioned = False
-            for res in self.initialResList:
+            for i in range(len(self.initialResList)):
+                res = self.initialResList[i]
                 if res.arrival_t == time:
                     hasSpace, spaceSlot, spaceTime = self.FindContinuousSpace(res)
                     if hasSpace and spaceTime > time:
-                        res.SetProvSpace(spaceTime, spaceSlot)
+                        self.initialResList[i].SetProvSpace(spaceTime, spaceSlot)
                         if (res.GetProvTime() == None or res.GetProvSlot() == None):
                             print(res.GetProvTime(), res.GetProvSlot())
                             raise
@@ -643,7 +682,6 @@ class Network:
                             self.immediateBlocking += 1
 
                     arrivedOrIBlocked_Index.append(i)
-                i += 1
             # Sort indexes from high to low as deleting and index reindexes earlier entries
             arrivedOrIBlocked_Index.sort(reverse=True)
             for index in arrivedOrIBlocked_Index:
@@ -750,8 +788,8 @@ def TestingRun( ResList):
 
 
 if __name__ == '__main__':
-    #RunTrial(0, detailed=True, debugGraphic=False)
-    TestingRun(TestResList)
+    RunTrial(0, detailed=True, debugGraphic=False)
+    #TestingRun(TestResList)
 #    test = Network(NumNodes, LinkList)
 #    test.TestRes()
 #    test2 = Network(NumNodes, LinkList)

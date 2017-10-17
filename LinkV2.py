@@ -103,6 +103,10 @@ class Link:
 
     # ================================= P r o v i s i o n i n g   F u n c t i o n s ===============================
     def AddToProvList(self, startT, startDepth, startSlot, size, depth, resNum):
+        # DEBUG, REMOVE LATER
+        for prov in self.provResList:
+            if prov.resNum == resNum:
+                raise
         self.provResList.append(ReservationData(startT, startDepth, startSlot, size, depth, resNum))
 
     def RemoveProvFromWindow(self, prov):
@@ -112,7 +116,8 @@ class Link:
         provEDepth  = prov.rStartT + prov.holdingT
         provESlot   = prov.sSlot + prov.nSlots
 
-        if provSSlot >= provESlot or provESlot >= 128:
+        if provSSlot >= provESlot or provESlot >= MAX_NUM_FREQ:
+            print(provSSlot, provESlot, provESlot, MAX_NUM_FREQ)
             raise
         if provSDepth >= provEDepth:
             raise
@@ -137,35 +142,6 @@ class Link:
 
     def GetWindowCopy(self, startT, endT):
         return deepcopy(self.timeWindow[startT:endT])
-
-    # Check if coordinates match up with existing prov
-    def CheckSpotInProv(self, slot, depth):
-        slotIndex = 0
-        for prov in self.provResList:
-            provSSlot = prov.rStartT
-            provSDepth = prov.sSlot
-            provESlot = prov.rStartT + prov.holdingT
-            provEDepth = prov.sSlot + prov.nSlots
-            if (provSSlot <= slot < provESlot) and (provSDepth <= depth < provEDepth):
-                return True, slotIndex
-            else:
-                slotIndex += 1
-                continue
-        return False, None
-
-
-    def CheckReprovision(self, slot, depth, startT):
-        provExists, provIndex = self.CheckSpotInProv(slot, depth)
-        if provExists:
-            if SMALL_OR_LARGE_WINDOW == SMALL:
-                if startT >= self.provResList[provIndex]:
-                    return True, provIndex
-                else:
-                    return False, None
-            else:
-                return True, provIndex
-        else:
-            return False, None
 
     def GetProvisionList(self):
         return self.provResList
@@ -278,3 +254,33 @@ def GetListOfOpenSpaces(timeWindow, size):
         i += 1
 
     return listOfSpaces  # If at least one suitable space is found, return true and the list of suitable spaces
+
+def PrintGraphic(window, start, end):
+    i = 0
+    for row in window[start:end]:
+        print("{:5} ".format(i), end='')
+        for column in row:
+            if column == FULL:
+                print("X", end='')
+            elif column == START:
+                print("O", end='')
+            elif column == EMPTY:
+                print("-", end='')
+            elif column == PROV:
+                print("P", end='')
+            else:
+                print(column)
+                raise
+
+        print('')
+        i += 1
+    print("      ", end='')
+    for x in range(MAX_NUM_FREQ):
+        print(str(int((x % 1000)/100)), end='')
+    print("\n      ", end='')
+    for x in range(MAX_NUM_FREQ):
+        print(str(int((x % 100)/10)), end='')
+    print("\n      ", end='')
+    for x in range(MAX_NUM_FREQ):
+        print(str(x % 10), end='')
+    print('')
