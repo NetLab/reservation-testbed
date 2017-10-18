@@ -7,7 +7,7 @@ STRT_WNDW_RANGE = STRT_WNDW_SIZE + 1
 
 SMALL = True
 LARGE = False
-SMALL_OR_LARGE_WINDOW   = SMALL
+SMALL_OR_large_WINDOW   = SMALL
 
 AVAIL_SLOTS_INDEX   = 0     # Index of available slots is the last index in the array
 TIME_WINDOW_INDEX   = 1     # index of actual implementation of time window

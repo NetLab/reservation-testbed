@@ -60,14 +60,12 @@ class Link:
     def GetListOfOpenSpaces(self, size, startT, depth):
         return GetListOfOpenSpaces(self.timeWindow[startT:startT+depth], size)  # If at least one suitable space is found, return true and the list of suitable spaces
 
-    def PlaceRes(self, startSlot, size, depth, startDepth, isProv, resNum, baseStartT = None):
+    def PlaceRes(self, startDepth, depth, startSlot, size, isProv, resNum, baseStartT = None):
         i = 0
         j = 0
         numSlotsFilled = 0
         for row in range(startDepth,startDepth+depth):
             self.availSlots[row] -= size
-        if isProv:
-            self.AddToProvList(baseStartT, startDepth, startSlot, size, depth, resNum)
         for i in range(depth):
             for j in range(size):
                 curSlot = self.timeWindow[startDepth + i][startSlot + j]
@@ -102,49 +100,24 @@ class Link:
             raise
 
     # ================================= P r o v i s i o n i n g   F u n c t i o n s ===============================
-    def AddToProvList(self, startT, startDepth, startSlot, size, depth, resNum):
-        # DEBUG, REMOVE LATER
-        for prov in self.provResList:
-            if prov.resNum == resNum:
-                raise
-        self.provResList.append(ReservationData(startT, startDepth, startSlot, size, depth, resNum))
 
-    def RemoveProvFromWindow(self, prov):
+    def RemoveProvFromWindow(self, startD, depth, startS, size):
 
-        provSDepth  = prov.rStartT
-        provSSlot   = prov.sSlot
-        provEDepth  = prov.rStartT + prov.holdingT
-        provESlot   = prov.sSlot + prov.nSlots
+        endD    = startD + depth
+        endS    = startS + size
 
-        if provSSlot >= provESlot or provESlot >= MAX_NUM_FREQ:
-            print(provSSlot, provESlot, provESlot, MAX_NUM_FREQ)
-            raise
-        if provSDepth >= provEDepth:
-            raise
-
-        for row in range(provSDepth, provEDepth):
-            for column in range(provSSlot, provESlot):
+        for row in range(startD, endD):
+            for column in range(startS, endS):
                 if self.timeWindow[row][column] == PROV:
                     self.timeWindow[row][column] = EMPTY
                 else:
                     print("Error: RemoveProv, slot",column, row, "was not PROV", self.timeWindow[row][column])
-                    self.PrintGraphic(provEDepth + 5)
-                    print("From", provSSlot, provSDepth, "to", provESlot, provEDepth)
+                    self.PrintGraphic(endD + 5)
+                    print("From", startS, startD, "to", endS, endD)
                     raise
-
-    def ClearProv(self, resID):
-        i = 0
-        for prov in self.provResList:
-            if prov.resNum == resID:
-                self.RemoveProvFromWindow(prov)# Remove provision from timewindow space
-                self.provResList.pop(i)     # Remove provision from list
-            i += 1
 
     def GetWindowCopy(self, startT, endT):
         return deepcopy(self.timeWindow[startT:endT])
-
-    def GetProvisionList(self):
-        return self.provResList
 
     # =================================== O t h e r   L i n k   F u n c t i o n s =================================
 

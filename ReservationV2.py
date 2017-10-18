@@ -140,20 +140,18 @@ class Reservation:
 # holding time  = 298 (actual 320)
 
 class ReservationData:
-    def __init__(self, baseStartT, realStartT, startSlot, num_slots, holdingT, resNum):
+    def __init__(self, baseStartT, realStartT, startSlot, num_slots, holdingT, path, resNum):
         self.bStartT    = baseStartT
         self.rStartT    = realStartT
         self.sSlot      = startSlot
         self.nSlots     = num_slots
         self.holdingT   = holdingT
+        self.path       = path
         self.resNum     = resNum
 
     def SetStartCoords(self, startT, startSlot):
         self.rStartT    = startT
         self.sSlot      = startSlot
-
-    def GetData(self):
-        return self.rStartT, self.sSlot, self.nSlots, self.holdingT
 
     def GetBaseStartT(self):
         return self.bStartT

@@ -1,5 +1,5 @@
 from LinkV2 import *
-from copy import deepcopy
+from copy import deepcopy, copy
 from time import *
 from argparse import *
 
@@ -15,8 +15,7 @@ class Network:
 
         self.initialResList     = []
         self.provisionedResList = []
-        self.resToBeSlotted     = []
-        self.completedResList   = []
+        self.tempProvResData    = []
 
         self.arrivingResList    = []  # Dictionary reservations that will arrive in the next time unit
 
@@ -313,42 +312,66 @@ class Network:
                 print("Oops, I did something wrong")
         return False, None, None
 
+    def AddToProvList(self, startT, startDepth, startSlot, size, depth, path, resNum):
+        self.tempProvResData.append(ReservationData(startT, startDepth, startSlot, size, depth, path, resNum))
+
+    def GetPathTempProv(self, path):
+        provList = []
+        for tempProv in self.tempProvResData:
+            for link in path:
+                if link in tempProv.path:
+                    provList.append(tempProv)
+                    break
+        provList.sort(key=lambda prov: (prov.bStartT, prov.resNum))
+        return provList
+
+    # Get a list of currently provisioned reservations along the incoming reservation's path
+    #   as well as min/max values for the relevant start/end times
     def GetReproWindow(self, res):
-        pathProvisions = []
-        provNotConsidered_Index = []
-        linkList = res.GetPath()
+        pathProvisions = []             # Currently provisioned reservations on res' path
+        minTime                 = 0     # Minimum start time for reservation to be considered for reprov
+        maxTime                 = 0     # Maximum start time for reservation to be considered for reprov
+        minWindowBase           = 0     # Base of window to be copied from current link configuration
+        maxWindowBound          = 0     # Bound of window to be copied from current link configuration
+        provNotConsidered_Index = []    # Prov to be removed from pathProvision as they fall outside min/maxTime (index)
 
-        for link in linkList:
-            pathProvisions += self.linkDict[link].GetProvisionList()
-        pathProvisions.sort(key=lambda prov: (prov.bStartT, prov.resNum))
+        resStartT       = res.GetStartT()
+        linkList        = res.GetPath()
+        pathProvisions  = self.GetPathTempProv(linkList)
+
+        maxTime = resStartT + res.GetHoldingT() + STRT_WNDW_SIZE
+
         if len(pathProvisions) > 0:
-            minTime         = pathProvisions[0].bStartT
-            minWindowSize   = minTime
-            if res.GetStartT() < minTime:
-                minWindowSize = res.GetStartT()
+            if SMALL_OR_large_WINDOW:
+                minTime = resStartT
+            else:
+                minTime = self.time
         else:
-            minTime = 0
-        # Default maxTime is the max time the res can go to
-        maxTime         = res.GetStartT() + res.GetHoldingT() # Time after which reservations may not be considered.
-        maxWindowSize   = maxTime + STRT_WNDW_RANGE # Maximum depth of time window needed to reprovision
-        i = 0
-        for prov in pathProvisions:
-            if prov.rStartT > maxTime:
-                provNotConsidered_Index.append(i)
-            elif prov.bStartT + prov.holdingT + STRT_WNDW_RANGE > maxWindowSize:  # If larger time window needed
-                maxWindowSize = prov.bStartT + prov.holdingT + STRT_WNDW_RANGE  # Set new time window size
-            i += 1
-        provNotConsidered_Index.sort(reverse=True)  # Sort indexes to be removed in high->low as to not reindex
-        for prov_Index in provNotConsidered_Index:
-            pathProvisions.pop(prov_Index)  # Remove each index
+            return None, None, None, None, []   # Return Nones and an empty list if no provisions
 
-        return minTime, minWindowSize, maxTime, maxWindowSize, pathProvisions
+        for provIndex in range(len(pathProvisions)):
+            prov = pathProvisions[provIndex]
+            if prov.rStartT < minTime or maxTime < prov.rStartT:
+                provNotConsidered_Index.append(provIndex)
+
+        provNotConsidered_Index.sort(reverse=True)
+        for i in provNotConsidered_Index:       # Remove all provisions outside of reprov window
+            pathProvisions.pop(i)
+
+        minWindowBase   = minTime   # Set default window B/B to known values
+        maxWindowBound  = maxTime
+        for prov in pathProvisions:
+            if prov.bStartT < minWindowBase:
+                minWindowBase = prov.bStartT
+            if prov.bStartT + prov.holdingT + STRT_WNDW_SIZE > maxWindowBound:
+                maxWindowBound = prov.bStartT + prov.holdingT + STRT_WNDW_SIZE
+
+        return minTime, minWindowBase, maxTime, maxWindowBound, pathProvisions
 
     def PopProvisions(self, pathProvisions):
         reprovisionedResNum = []
         tempProvResList     = []
         provRes_Index       = []
-
 
         for resData in pathProvisions:  # Get a list of all unique resNum involved in this reprovisioning
             if resData.resNum in reprovisionedResNum:   # If it exists in the list already, pass
@@ -362,135 +385,149 @@ class Network:
                     provRes_Index.append(i)
                     break
 
-        provRes_Index.sort(reverse=True)
-
         if len(reprovisionedResNum) != len(provRes_Index):
             print("Mismatched List Length")
             raise
 
+        provRes_Index.sort(reverse=True)
         for index in provRes_Index:
-            try:
-                tempProvResList.append(self.provisionedResList.pop(index))
-            except IndexError:
-                print(index, len(self.provisionedResList))
-                for index_debug in provRes_Index:
-                    print(index_debug, ' ', end='')
-                raise
+            tempProvResList.append(self.provisionedResList.pop(index))
 
         return tempProvResList
 
-    def ClearProvAcrossLinks(self, res):
-        linkList = res.GetPath()
-        resID = res.resNum
-        for link in linkList:
-            self.linkDict[link].ClearProv(resID)
+    def ClearProvAcrossLinks(self, resData):
+        resID = resData.resNum
+        foundProv = False
+        i = 0
+        for prov in self.tempProvResData:
+            if prov.resNum == resID:
+                foundProv = True
+                break
+            i += 1
+        if foundProv == False:
+            raise
+
+        path    = prov.path
+        startD  = prov.rStartT
+        depth   = prov.holdingT
+        startS  = prov.sSlot
+        size    = prov.nSlots
+        self.tempProvResData.pop(i)
+        for link in path:
+            self.linkDict[link].RemoveProvFromWindow(startD, depth, startS, size)
 
     def CheckReprovision(self, res, time):
         tempLinkDict    = {}
         listLinks       = res.GetPath()
+        relevantLinks   = copy(listLinks)
         tempResCoords   = {}
         newReprovResList = []
 
-        minTime, minWindowSize, maxTime, maxWindowSize, pathProvisions = self.GetReproWindow(res)
+        minTime, minWindowBase, maxTime, maxWindowBound, pathProvisions = self.GetReproWindow(res)
+        if len(pathProvisions) <= 0: # minTime is set to "None" if no reservations may be reprovisioned at this time
+            return False
         reprovResList = self.PopProvisions(pathProvisions)
 
         for rpRes in reprovResList:
-            relevantLinks = rpRes.GetPath()
-            for link in relevantLinks:
-                if link in listLinks:
+            tempLinks = rpRes.GetPath()
+            for link in tempLinks:
+                if link in relevantLinks:
                     continue
                 else:
-                    listLinks.append(link)
-        for link in listLinks:
+                    relevantLinks.append(link)
+        for link in relevantLinks:
             tempLinkDict[link]    = [None,None]
-            tempLinkDict[link][0] = self.linkDict[link].GetWindowCopy(minWindowSize, maxWindowSize)
-            tempLinkDict[link][1] = self.linkDict[link].GetProvisionList()
-
+            tempLinkDict[link] = self.linkDict[link].GetWindowCopy(minWindowBase, maxWindowBound)
         reprovResList.append(res)   # Probationally add res to list
         reprovResList.sort(key=lambda rpRes: (rpRes.start_t, rpRes.resNum))
-
-        # Clear out all reservation spots in the tempWindows
-        # for link in res.GetPath():
-        #     print("LINK", link)
-        #     PrintGraphic(tempLinkDict[link][0], 0, len(tempLinkDict[link][0]))
-        for link in tempLinkDict.keys():
-            for provIndex in range(len(tempLinkDict[link][1])):
-                prov = tempLinkDict[link][1][provIndex]
-                provStartD  = prov.rStartT - minTime # Get base startT relative to earliest startT
-                provStartS  = prov.sSlot
-                provSize    = prov.nSlots
-                provDepth   = prov.holdingT
-                for i in range(provStartD, provDepth):
-                    for j in range(provStartS, provSize):
+        for provIndex in range(len(pathProvisions)):
+            prov        = pathProvisions[provIndex]
+            provStartD  = prov.rStartT - minWindowBase # Get base startT relative to earliest startT
+            provStartS  = prov.sSlot
+            provDepth   = prov.holdingT
+            provSize    = prov.nSlots
+            provEndD    = provStartD + provDepth
+            provEndS    = provStartS + provSize
+            provPath    = prov.path
+            for link in provPath:
+                for i in range(provStartD, provEndD):
+                    for j in range(provStartS, provEndS):
                         try:
-                            if tempLinkDict[link][0][i][j] == PROV:
-                                tempLinkDict[link][0][i][j] = EMPTY
+                            if tempLinkDict[link][i][j] == PROV:
+                                tempLinkDict[link][i][j] = EMPTY
                             else:
-                                PrintGraphic(tempLinkDict[link][0], 0, -1)
+                                PrintGraphic(tempLinkDict[link], 0, -1)
                                 print(i+minTime,j, provSize)
-                                print("From ", provStartD, "to", provDepth, "and", provStartS, "to", provSize)
-                                print(tempLinkDict[link][0][i][j] )
-                                print("Max window size", maxWindowSize)
+                                print("Link", link, "on", provPath)
+                                print("From ", provStartD, "to", provEndD, "and", provStartS, "to", provEndS)
+                                print(tempLinkDict[link][i][j] )
+                                print("Max window size", maxWindowBound)
                                 raise
                         except IndexError:  # DEBUG, REMOVE
                             print(i, j)
                             print("From ", provStartD, "to", provDepth, "and", provStartS, "to", provSize)
-                            print("With window from", minTime, "to", maxWindowSize)
-                            print(len(tempLinkDict[link][0]))
-                            print(len(tempLinkDict[link][0][i]))
-                            print(len(tempLinkDict[link][0][i][j]))
+                            print("With window from", minTime, "to", maxWindowBound)
+                            print(len(tempLinkDict[link]))
+                            print(len(tempLinkDict[link][i]))
+                            print(len(tempLinkDict[link][i][j]))
                             raise
-        # for link in res.GetPath():
-        #     print("RE-LINK", link)
-        #     PrintGraphic(tempLinkDict[link][0], 0, len(tempLinkDict[link][0]))
-        # raise
+
         allResReprov = False
         #   Use temporary window to find possible rearrangement of provisions
         for rpRes in reprovResList:
-            listLinks   = rpRes.GetPath()
+            rpListLinks = rpRes.GetPath()
+            curLink     = rpListLinks[0]
             rpStartT    = rpRes.GetStartT()
             rpSize      = rpRes.num_slots
             rpDepth     = rpRes.GetHoldingT()
             rpNum       = rpRes.resNum
-            windowBaseTime = 0  # The starting slot of the sliding window
-            if time > rpStartT: # If it is already past the reservations original start time, the window is smaller
-                windowBaseTime = time - rpStartT        # Base of window is first non-past time in window
-                if windowBaseTime >= STRT_WNDW_RANGE:   # Bound of window is startT + STRT_WNDW_RANGE
+            startBaseTime = 0  # The starting slot of the sliding window
+            if self.time > rpStartT: # If it is already past the reservations original start time, the window is smaller
+                startBaseTime = self.time - rpStartT        # Base of window is first non-past time in window
+                if startBaseTime >= STRT_WNDW_RANGE:   # Bound of window is startT + STRT_WNDW_RANGE
                     raise
-            for windowSpace in range(windowBaseTime, STRT_WNDW_RANGE):
-                startT  = rpStartT + windowSpace - minTime
+            for windowSpace in range(startBaseTime, STRT_WNDW_RANGE):
+                startT  = rpStartT + windowSpace - minWindowBase
                 endT    = startT + rpDepth
-                spaceOptions = GetListOfOpenSpaces(tempLinkDict[link][0][startT:endT], rpSize)
+                spaceOptions = GetListOfOpenSpaces(tempLinkDict[curLink][startT:endT], rpSize)
                 spaceFound = False
-                if len(listLinks) == 1 and len(spaceOptions) > 0:
+                # If the path is only one link long, spaceOptions contains all valid spaces
+                if len(rpListLinks) == 1 and len(spaceOptions) > 0:
                     spaceFound = True
                     space = spaceOptions[0]
                     tempResCoords[rpNum] = [startT + minTime, space]
+                # Otherwise
                 else:
+                    # For each space available
                     for space in spaceOptions:
-                        for link in listLinks[1:]:
-                            if CheckAreaIsFull(tempLinkDict[link][0][startT:endT], space, rpSize):
+                        # In each link past the first
+                        for curLink in rpListLinks[1:]:
+                            # Check if that area is full, if so, spacefound is false and escape the link check loop
+                            if CheckAreaIsFull(tempLinkDict[curLink][startT:endT], space, rpSize):
                                 spaceFound = False
                                 break
+                            # If not, spaceFound is true and continue through the rest of the links
                             else:
                                 spaceFound = True
+                        # If none of the links has that space full and exited the loop, record those coords; exit space loop
                         if spaceFound == True:
                             tempResCoords[rpNum] = [startT + minTime, space]    # Un-scale startT and record new coords
                             break
                         else:
                             continue
                 if spaceFound:
-                    for link in range(len(listLinks)):
+                    for curLink in rpListLinks:
                         for i in range(startT, endT):
                             for j in range(space, space+rpSize):
-                                if tempLinkDict[link][0][i][j] == EMPTY:
-                                    tempLinkDict[link][0][i][j] = PROV
+                                if tempLinkDict[curLink][i][j] == EMPTY:
+                                    tempLinkDict[curLink][i][j] = PROV
                                 else:
-                                    print(i, j)
-                                    errorStartT = startT - 10
-                                    if errorStartT < 0:
-                                        errorStartT = 0
-                                    PrintGraphic(tempLinkDict[link][0], errorStartT, endT)
+                                    for testLink in rpListLinks:
+                                        PrintGraphic(tempLinkDict[testLink], 0, endT)
+                                    print("initial space options", spaceOptions)
+                                    print("Error at", i, j)
+                                    print("For Res from", startT,"to", endT, "and", space, "to", space+rpSize)
+                                    print("Link", curLink, "of", rpListLinks)
                                     raise
                     allResReprov = True
                     break
@@ -502,10 +539,11 @@ class Network:
         if allResReprov:    # If all reservations could be reprovisioned without blocking
             numChanged          = 0
             removedRes_Index    = []
+            for delProv in pathProvisions:
+                self.ClearProvAcrossLinks(delProv)
             for resID in tempResCoords:
                 for rpRes in range(len(reprovResList)):
                     if resID == reprovResList[rpRes].GetResNum():
-                        self.ClearProvAcrossLinks(reprovResList[rpRes])
                         numChanged += 1
                         rpTime  = tempResCoords[resID][0]
                         rpSlot  = tempResCoords[resID][1]
@@ -516,7 +554,6 @@ class Network:
                             self.AllocateAcrossLinks(rpSlot, rpTime, reprovResList[rpRes], False)
                             self.completedRes += 1
                             removedRes_Index.append(rpRes)  # If res completes, record its index so not put back in self.provResList
-                            print("Prov starting now", resID)
                         else:
                             self.ProvisionAcrossLinks(reprovResList[rpRes], rpSlot, rpTime)
 
@@ -531,7 +568,6 @@ class Network:
             for prov in reprovResList:
                 if prov.provTime == None or prov.provSlot == None:
                     raise
-                print("Res", prov.resNum, prov.provTime, prov.provSlot)
         else:               # If not all reservations could be reprovisioned without blocking
             for rpRes in range(len(reprovResList)):
                 if reprovResList[rpRes].resNum == res.GetResNum():
@@ -540,6 +576,7 @@ class Network:
         self.provisionedResList += reprovResList
         self.provisionedResList.sort(key=lambda rpRes: (rpRes.start_t, rpRes.resNum))
         if allResReprov == True:
+
             return True
         else:
             return False
@@ -553,9 +590,6 @@ class Network:
     def ProvisionAcrossLinks(self, res, startSlot, startDepth):
         self.AllocateAcrossLinks(startSlot, startDepth, res, True)
 
-    def AllocProvAcrossLinks(self, res):
-        startSlot = res
-
     def AllocateAcrossLinks(self, startSlot, startDepth, res, isProv):
         startT      = startDepth
         size        = res.GetNumSlots()
@@ -563,13 +597,17 @@ class Network:
         links       = res.GetPath()
         baseStartT  = res.GetStartT()
         resNum      = res.GetResNum()
+        path        = res.GetPath()
+
+        if isProv:
+            self.AddToProvList(baseStartT, startT, startSlot, size, holdingT, path, resNum)
 
         for link in links:
             try:
-                self.linkDict[link].PlaceRes(startSlot, size, holdingT, startT, isProv, resNum, baseStartT=baseStartT)
+                self.linkDict[link].PlaceRes(startT, holdingT, startSlot, size, isProv, resNum, baseStartT=baseStartT)
             except:
                 print("On link", link, "of links", links)
-                print("Error at", startT, startSlot, "of size", size, holdingT, "offset")
+                print("Error at", startT, startSlot, "of size", size, holdingT)
                 print("res", res.GetResNum())
                 raise
 
@@ -629,6 +667,7 @@ class Network:
 
         maxTime = self.initialResList[-1].GetStartT() + 100 + STRT_WNDW_RANGE
         for time in range(0, maxTime):
+            self.time = time
             i = 0
             allocated_Index.clear()
             # ============= A L L O C A T I O N   L O O P ================
