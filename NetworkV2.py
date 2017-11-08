@@ -368,6 +368,40 @@ class Network:
 
         return minTime, minWindowBase, maxTime, maxWindowBound, pathProvisions
 
+    def ClearProvAcrossTempLinks(self, pathProvisions, tempLinkDict, minWindowBase, minTime, maxWindowBound):
+        for provIndex in range(len(pathProvisions)):
+            prov        = pathProvisions[provIndex]
+            provStartD  = prov.rStartT - minWindowBase # Get base startT relative to earliest startT
+            provStartS  = prov.sSlot
+            provDepth   = prov.holdingT
+            provSize    = prov.nSlots
+            provEndD    = provStartD + provDepth
+            provEndS    = provStartS + provSize
+            provPath    = prov.path
+            for link in provPath:
+                for i in range(provStartD, provEndD):
+                    for j in range(provStartS, provEndS):
+                        try:
+                            if tempLinkDict[link][i][j] == PROV or REMOVE_TRUE:
+                                tempLinkDict[link][i][j] = EMPTY
+                            else:
+                                PrintGraphic(tempLinkDict[link], 0, -1)
+                                print(i+minTime,j, provSize)
+                                print("Link", link, "on", provPath)
+                                print("From ", provStartD, "to", provEndD, "and", provStartS, "to", provEndS)
+                                print(tempLinkDict[link][i][j] )
+                                print("Max window size", maxWindowBound)
+                                raise
+                        except IndexError:  # DEBUG, REMOVE
+                            print(i, j)
+                            print("From ", provStartD, "to", provDepth, "and", provStartS, "to", provSize)
+                            print("With window from", minTime, "to", maxWindowBound)
+                            print(len(tempLinkDict[link]))
+                            print(len(tempLinkDict[link][i]))
+                            print(len(tempLinkDict[link][i][j]))
+                            raise
+        return tempLinkDict
+
     def PopProvisions(self, pathProvisions):
         reprovisionedResNum = []
         tempProvResList     = []
@@ -426,6 +460,7 @@ class Network:
         minTime, minWindowBase, maxTime, maxWindowBound, pathProvisions = self.GetReproWindow(res)
         if len(pathProvisions) <= 0: # minTime is set to "None" if no reservations may be reprovisioned at this time
             return False
+
         reprovResList = self.PopProvisions(pathProvisions)
 
         for rpRes in reprovResList:
@@ -440,37 +475,8 @@ class Network:
             tempLinkDict[link] = self.linkDict[link].GetWindowCopy(minWindowBase, maxWindowBound)
         reprovResList.append(res)   # Probationally add res to list
         reprovResList.sort(key=lambda rpRes: (rpRes.start_t, rpRes.resNum))
-        for provIndex in range(len(pathProvisions)):
-            prov        = pathProvisions[provIndex]
-            provStartD  = prov.rStartT - minWindowBase # Get base startT relative to earliest startT
-            provStartS  = prov.sSlot
-            provDepth   = prov.holdingT
-            provSize    = prov.nSlots
-            provEndD    = provStartD + provDepth
-            provEndS    = provStartS + provSize
-            provPath    = prov.path
-            for link in provPath:
-                for i in range(provStartD, provEndD):
-                    for j in range(provStartS, provEndS):
-                        try:
-                            if tempLinkDict[link][i][j] == PROV:
-                                tempLinkDict[link][i][j] = EMPTY
-                            else:
-                                PrintGraphic(tempLinkDict[link], 0, -1)
-                                print(i+minTime,j, provSize)
-                                print("Link", link, "on", provPath)
-                                print("From ", provStartD, "to", provEndD, "and", provStartS, "to", provEndS)
-                                print(tempLinkDict[link][i][j] )
-                                print("Max window size", maxWindowBound)
-                                raise
-                        except IndexError:  # DEBUG, REMOVE
-                            print(i, j)
-                            print("From ", provStartD, "to", provDepth, "and", provStartS, "to", provSize)
-                            print("With window from", minTime, "to", maxWindowBound)
-                            print(len(tempLinkDict[link]))
-                            print(len(tempLinkDict[link][i]))
-                            print(len(tempLinkDict[link][i][j]))
-                            raise
+
+        tempLinkDict = self.ClearProvAcrossTempLinks(pathProvisions, tempLinkDict, minWindowBase, minTime, maxWindowBound)
 
         allResReprov = False
         #   Use temporary window to find possible rearrangement of provisions
@@ -487,6 +493,7 @@ class Network:
                 if startBaseTime >= STRT_WNDW_RANGE:   # Bound of window is startT + STRT_WNDW_RANGE
                     raise
             for windowSpace in range(startBaseTime, STRT_WNDW_RANGE):
+                curLink = rpListLinks[0]
                 startT  = rpStartT + windowSpace - minWindowBase
                 endT    = startT + rpDepth
                 spaceOptions = GetListOfOpenSpaces(tempLinkDict[curLink][startT:endT], rpSize)
@@ -511,6 +518,7 @@ class Network:
                                 spaceFound = True
                         # If none of the links has that space full and exited the loop, record those coords; exit space loop
                         if spaceFound == True:
+                            foundStartT = startT
                             tempResCoords[rpNum] = [startT + minTime, space]    # Un-scale startT and record new coords
                             break
                         else:
@@ -523,11 +531,15 @@ class Network:
                                     tempLinkDict[curLink][i][j] = PROV
                                 else:
                                     for testLink in rpListLinks:
+                                        print("Link", testLink)
                                         PrintGraphic(tempLinkDict[testLink], 0, endT)
+                                    print(foundStartT, startT)
                                     print("initial space options", spaceOptions)
                                     print("Error at", i, j)
                                     print("For Res from", startT,"to", endT, "and", space, "to", space+rpSize)
                                     print("Link", curLink, "of", rpListLinks)
+                                    print("Links in rpListLinks")
+                                    print(rpListLinks)
                                     raise
                     allResReprov = True
                     break
@@ -555,7 +567,11 @@ class Network:
                             self.completedRes += 1
                             removedRes_Index.append(rpRes)  # If res completes, record its index so not put back in self.provResList
                         else:
-                            self.ProvisionAcrossLinks(reprovResList[rpRes], rpSlot, rpTime)
+                            try:
+                                self.ProvisionAcrossLinks(reprovResList[rpRes], rpSlot, rpTime)
+                            except:
+                                print("CHECK", rpTime, reprovResList[rpRes].GetStartT())
+                                raise
 
             if numChanged != len(tempResCoords):
                 print("Some unacknowledged res", len(tempResCoords), numChanged)
@@ -576,7 +592,9 @@ class Network:
         self.provisionedResList += reprovResList
         self.provisionedResList.sort(key=lambda rpRes: (rpRes.start_t, rpRes.resNum))
         if allResReprov == True:
-
+            print("WasReproved")
+            for rpPrint in reprovResList:
+                print("     ", rpPrint.resNum)
             return True
         else:
             return False
@@ -754,6 +772,7 @@ class Network:
         return self.completedRes, localBlocking, linkBlocking, DEBUG_Total_Time
 
     def PrintGraphics(self, link, end, all=False):
+        print("Link:", link)
         self.linkDict[link].PrintGraphic(end)
 
 

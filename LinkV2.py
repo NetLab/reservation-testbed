@@ -63,13 +63,14 @@ class Link:
     def PlaceRes(self, startDepth, depth, startSlot, size, isProv, resNum, baseStartT = None):
         i = 0
         j = 0
+        errorRaised = False
         numSlotsFilled = 0
         for row in range(startDepth,startDepth+depth):
             self.availSlots[row] -= size
         for i in range(depth):
             for j in range(size):
                 curSlot = self.timeWindow[startDepth + i][startSlot + j]
-                if curSlot == EMPTY:
+                if curSlot == EMPTY or REMOVE_TRUE:
                     if j == 0 and i == 0:
                         if isProv == False:
                             self.timeWindow[startDepth + i][startSlot + j] = START
@@ -83,16 +84,20 @@ class Link:
                     numSlotsFilled += 1
                 elif curSlot == PROV:
                     print("Error: PlaceRes, no provisioned slots should exist at this point: time,", startDepth, startSlot + j, startDepth + i)
-                    self.PrintGraphic(startDepth + depth + 3)
-                    raise
+                    self.PrintGraphic(startDepth, startDepth + depth, startOffset = startDepth)
+                    errorRaised = True
                 elif self.timeWindow[startDepth + i][startSlot + j] == FULL or self.timeWindow[startDepth + i][startSlot + j] == START:
                     print("LINK", self.nodes)
-                    self.PrintGraphic(startDepth + depth + 10)
+                    self.PrintGraphic(startDepth, startDepth + depth, startOffset = startDepth)
                     print("tried to fill slot that was aready full: StartSlot", startSlot, j, "StartDepth", startDepth, i)
                     print("Dimensions", size, "by", depth)
-                    raise
+                    errorRaised = True
                 else:
                     print(self.timeWindow[startDepth + i][startSlot + j])
+                    errorRaised = True
+                if(errorRaised):
+                    print("StartDepth", startDepth, "StartSlot", startSlot)
+                    print("depth", depth, "size", size)
                     raise
 
         if numSlotsFilled != (size*depth):
@@ -108,11 +113,11 @@ class Link:
 
         for row in range(startD, endD):
             for column in range(startS, endS):
-                if self.timeWindow[row][column] == PROV:
+                if self.timeWindow[row][column] == PROV or REMOVE_TRUE :
                     self.timeWindow[row][column] = EMPTY
                 else:
                     print("Error: RemoveProv, slot",column, row, "was not PROV", self.timeWindow[row][column])
-                    self.PrintGraphic(endD + 5)
+                    self.PrintGraphic(startD, endD, startOffset=startD)
                     print("From", startS, startD, "to", endS, endD)
                     raise
 
@@ -124,35 +129,8 @@ class Link:
     def PrintInfo(self):
         print("Link", self.nodes, "of cost", self.length)
 
-    def PrintGraphic(self, end):
-        i = 0
-        for row in self.timeWindow[0:end]:
-            print("{:5} ".format(i), end='')
-            for column in row:
-                if column == FULL:
-                    print("X", end='')
-                elif column == START:
-                    print("O", end='')
-                elif column == EMPTY:
-                    print("-", end='')
-                elif column == PROV:
-                    print("P", end='')
-                else:
-                    print(column)
-                    raise
-
-            print('')
-            i += 1
-        print("      ", end='')
-        for x in range(MAX_NUM_FREQ):
-            print(str(int((x % 1000)/100)), end='')
-        print("\n      ", end='')
-        for x in range(MAX_NUM_FREQ):
-            print(str(int((x % 100)/10)), end='')
-        print("\n      ", end='')
-        for x in range(MAX_NUM_FREQ):
-            print(str(x % 10), end='')
-        print('')
+    def PrintGraphic(self, start, end, startOffset = 0):
+        PrintGraphic(self.timeWindow, start, end, startOffset)
 
     def GetLinkNodes(self):
         return self.nodes[0], self.nodes[1]
@@ -228,10 +206,10 @@ def GetListOfOpenSpaces(timeWindow, size):
 
     return listOfSpaces  # If at least one suitable space is found, return true and the list of suitable spaces
 
-def PrintGraphic(window, start, end):
+def PrintGraphic(window, start, end, startOffset = 0):
     i = 0
     for row in window[start:end]:
-        print("{:5} ".format(i), end='')
+        print("{:5} ".format(i+startOffset), end='')
         for column in row:
             if column == FULL:
                 print("X", end='')
