@@ -592,18 +592,9 @@ class Network:
         self.provisionedResList += reprovResList
         self.provisionedResList.sort(key=lambda rpRes: (rpRes.start_t, rpRes.resNum))
         if allResReprov == True:
-            print("WasReproved")
-            for rpPrint in reprovResList:
-                print("     ", rpPrint.resNum)
             return True
         else:
             return False
-
-        #CHECK 1. Add res to reprov Res List
-        #2. Run simulation of possible reres
-        #3. If fail, block and remove res from rRL. If success, rewrite the startSlot and startTime of each res in rRL to its new space
-        #4. If success, clear and reprovision all res in rRL in all links (dont forget to edit link provision lists).
-        #5. Reappend reprovResList to self.provisionedResList.
 
     def ProvisionAcrossLinks(self, res, startSlot, startDepth):
         self.AllocateAcrossLinks(startSlot, startDepth, res, True)
