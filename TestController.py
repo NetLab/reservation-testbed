@@ -45,11 +45,7 @@ def WorkerInit():
     pass
 
 def InitRun(myLambdaIndex):
-    RandSeed(myLambdaIndex)
     RunTrial(myLambdaIndex)
-
-def RandSeed(mySeed):
-    random.seed(a=mySeed)
 
 alt = False
 if __name__ == '__main__':

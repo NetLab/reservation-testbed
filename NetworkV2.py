@@ -220,10 +220,12 @@ class Network:
         return res.arrival_t    # Return arrival time generated for this reservation
 
     # Generate several reservations with random values
-    def CreateMultRes(self, my_lambda, numRes):
+    def CreateMultRes(self, my_lambda, numRes, seedInt):
         i = 0
         prevArrivalT = 0
         nodes = self.GetNodes()
+        random.seed(a=seedInt)
+
         while i < numRes:
             prevArrivalT = self.CreateRes(my_lambda, nodes, i, prevArrivalT)
             i += 1
@@ -382,7 +384,7 @@ class Network:
                 for i in range(provStartD, provEndD):
                     for j in range(provStartS, provEndS):
                         try:
-                            if tempLinkDict[link][i][j] == PROV or REMOVE_TRUE:
+                            if tempLinkDict[link][i][j] == PROV:
                                 tempLinkDict[link][i][j] = EMPTY
                             else:
                                 PrintGraphic(tempLinkDict[link], 0, -1)
@@ -662,14 +664,14 @@ class Network:
         print("Avg Size Req", avgSR/numRes)
         print("Avg Slot Size", avgSS/numRes)
 
-    def MainFunction(self, my_lambda, numRes, genRes = True, info = False):
+    def MainFunction(self, my_lambda, numRes, seedInt, genRes = True, info = False):
         allocated_Index             = []
         arrivedOrIBlocked_Index     = []
 
         DEBUG_Total_Time = clock()
 
         if genRes:
-            self.CreateMultRes(my_lambda, numRes)
+            self.CreateMultRes(my_lambda, numRes, seedInt)
         else:
             numRes = len(self.initialResList)
         self.SortInitResByArrivalT()
@@ -798,9 +800,9 @@ def RunTrial(indexLambda, detailed=False, debugGraphic = False):
     avgProm = 0
     myLambda = LambdaList[indexLambda]
     for x in range(NumTrials):
-        DetermineSeed(indexLambda * x ^ x)
+        seedInt = indexLambda * x ^x
         test = Network(NumNodes, LinkList)
-        complete, immediate, promised, time = test.MainFunction(myLambda, NumRes, info=True)
+        complete, immediate, promised, time = test.MainFunction(myLambda, NumRes, seedInt, info=True)
         avgTime += time
         avgComp += complete
         avgImme += immediate

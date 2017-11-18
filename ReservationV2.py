@@ -70,7 +70,6 @@ class Reservation:
         return self.arrival_t
 
     def GenArrivalTime(self, my_lambda):
-        #seed()
         randNum = random.uniform(0.0000000000000001, 1)
         return round((-1 * log(randNum))/my_lambda)
 
@@ -78,11 +77,9 @@ class Reservation:
         return self.holding_t
 
     def GenHoldingTime(self):
-        #seed()
         return ceil((-1 * log(random.uniform(0.0000000000000001, 1)))/Mu)
 
     def GenBkAheadTime(self):
-        #seed()
         return random.randint(1,100)
 
     def GetStartT(self):
@@ -91,7 +88,6 @@ class Reservation:
     # ---------------------- N u m b e r   o f   S l o t s -------------------------
 
     def GenSizeRequest(self):
-        #seed()
         #return 200 - (random.randint(1,16) * MAX_SLOT_SIZE)
         return random.randint(1, MAX_REQ_SIZE)
 
@@ -163,7 +159,6 @@ def FormatLinkName_String(nodes):
     return "".join(sorted(nodes))
 
 if __name__ == '__main__':
-    random.seed(12345)
     test = Reservation(2, "AB", 1, 0)
     test.SetNumSlots(500)
     test.PrintInfo()

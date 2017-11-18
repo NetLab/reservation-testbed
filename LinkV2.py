@@ -23,6 +23,7 @@ class Link:
         self.curTime        = 0
         self.numBlocks      = 0
         self.provResList    = []
+        self.windowScale    = 0
 
     # ===================================== R e s e r v a t i o n   W i n d o w ===================================
 
@@ -39,6 +40,9 @@ class Link:
 
             self.timeWindow += newFrames
             self.availSlots += newAvail
+
+    def ScaleStartTime(self, startT):
+        return startT - self.windowScale
 
     # For checking if a space exists starting from a current start slot
     def CheckSpaceFull(self, startSlot, size, startT, depth):
@@ -70,7 +74,7 @@ class Link:
         for i in range(depth):
             for j in range(size):
                 curSlot = self.timeWindow[startDepth + i][startSlot + j]
-                if curSlot == EMPTY or REMOVE_TRUE:
+                if curSlot == EMPTY:
                     if j == 0 and i == 0:
                         if isProv == False:
                             self.timeWindow[startDepth + i][startSlot + j] = START
@@ -113,7 +117,7 @@ class Link:
 
         for row in range(startD, endD):
             for column in range(startS, endS):
-                if self.timeWindow[row][column] == PROV or REMOVE_TRUE :
+                if self.timeWindow[row][column] == PROV:
                     self.timeWindow[row][column] = EMPTY
                 else:
                     print("Error: RemoveProv, slot",column, row, "was not PROV", self.timeWindow[row][column])
