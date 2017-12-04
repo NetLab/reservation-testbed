@@ -7,7 +7,7 @@ class Link:
         self.timeWindow     = []
         self.availSlots     = []
 
-        for i in range(TIME_WNDW_SIZE):
+        for i in range(InitWindowSize):
             row = [EMPTY] * MAX_NUM_FREQ
             self.timeWindow.append(row)
 
@@ -27,33 +27,38 @@ class Link:
 
     # ===================================== R e s e r v a t i o n   W i n d o w ===================================
 
-    def UpdateSize(self, startT, depth):
-        windowLength    = len(self.timeWindow)
+    def UpdateSize(self, time):
         newFrames       = []
         newAvail        = []
-        if windowLength < startT + depth + STRT_WNDW_SIZE:
-            for x in range(10 * (startT + depth + STRT_WNDW_SIZE - windowLength)):
-                row     = [EMPTY] * MAX_NUM_FREQ
-                newFrames.append(row)
-                total   = MAX_NUM_FREQ
-                newAvail.append(total)
 
-            self.timeWindow += newFrames
-            self.availSlots += newAvail
+        scaledTime = self.ScaleStartTime(time)
+        self.timeWindow = self.timeWindow[scaledTime:]
+        self.availSlots = self.availSlots[scaledTime:]
+        self.windowScale = time
+
+        for x in range(UpdateTimeToAdd):
+            row     = [EMPTY] * MAX_NUM_FREQ
+            newFrames.append(row)
+            newAvail.append(MAX_NUM_FREQ)
+
+        self.timeWindow += newFrames
+        self.availSlots += newAvail
 
     def ScaleStartTime(self, startT):
         return startT - self.windowScale
 
     # For checking if a space exists starting from a current start slot
     def CheckSpaceFull(self, startSlot, size, startT, depth):
+        startT = self.ScaleStartTime(startT)
         return CheckAreaIsFull(self.timeWindow[startT:startT+depth], startSlot, size)
 
 
     def GetTimeAvailSlots(self, startT, depth):
-        self.UpdateSize(startT, depth)
+        startT = self.ScaleStartTime(startT)
         return self.availSlots[startT]
 
     def CheckLineFull(self, startT, slot, depth):
+        startT = self.ScaleStartTime(startT)
         for row in range(startT, startT + depth):
             if self.timeWindow[row][slot] != EMPTY:
                 return True
@@ -62,15 +67,19 @@ class Link:
         return False
 
     def GetListOfOpenSpaces(self, size, startT, depth):
+        startT = self.ScaleStartTime(startT)
         return GetListOfOpenSpaces(self.timeWindow[startT:startT+depth], size)  # If at least one suitable space is found, return true and the list of suitable spaces
 
     def PlaceRes(self, startDepth, depth, startSlot, size, isProv, resNum, baseStartT = None):
-        i = 0
-        j = 0
         errorRaised = False
         numSlotsFilled = 0
+        startDepth = self.ScaleStartTime(startDepth)
         for row in range(startDepth,startDepth+depth):
-            self.availSlots[row] -= size
+            try:
+                self.availSlots[row] -= size
+            except IndexError:
+                print("Link", self.nodes, "is of invalid length", len(self.timeWindow), "for res from", startDepth, "to", startDepth + depth)
+                raise
         for i in range(depth):
             for j in range(size):
                 curSlot = self.timeWindow[startDepth + i][startSlot + j]
@@ -110,22 +119,26 @@ class Link:
 
     # ================================= P r o v i s i o n i n g   F u n c t i o n s ===============================
 
-    def RemoveProvFromWindow(self, startD, depth, startS, size):
+    def RemoveProvFromWindow(self, startDepth, depth, startSlot, size):
 
-        endD    = startD + depth
-        endS    = startS + size
+        scaledStart = self.ScaleStartTime(startDepth)
+        endD    = scaledStart + depth
+        endS    = startSlot + size
 
-        for row in range(startD, endD):
-            for column in range(startS, endS):
+        for row in range(scaledStart, endD):
+            for column in range(startSlot, endS):
                 if self.timeWindow[row][column] == PROV:
                     self.timeWindow[row][column] = EMPTY
                 else:
                     print("Error: RemoveProv, slot",column, row, "was not PROV", self.timeWindow[row][column])
-                    self.PrintGraphic(startD, endD, startOffset=startD)
-                    print("From", startS, startD, "to", endS, endD)
+                    self.PrintGraphic(0, -1, startOffset=scaledStart)
+                    print("From", startSlot, scaledStart, "to", endS, endD)
+                    print("Window Scale", self.windowScale)
                     raise
 
     def GetWindowCopy(self, startT, endT):
+        startT = self.ScaleStartTime(startT)
+        endT = self.ScaleStartTime(endT)
         return deepcopy(self.timeWindow[startT:endT])
 
     # =================================== O t h e r   L i n k   F u n c t i o n s =================================
@@ -134,23 +147,12 @@ class Link:
         print("Link", self.nodes, "of cost", self.length)
 
     def PrintGraphic(self, start, end, startOffset = 0):
+        startT = self.ScaleStartTime(start)
+        end = self.ScaleStartTime(start)
         PrintGraphic(self.timeWindow, start, end, startOffset)
 
     def GetLinkNodes(self):
         return self.nodes[0], self.nodes[1]
-
-# testNode = Network()
-# i = 1
-# total = 0
-# while(i < 21):
-#     for x in range(0,20):
-#         total += testNode.RunProcess(i)
-#
-#     print("Total Number of Blocks with lambda", i, "equal to:", total/20)
-#     i += 1
-#
-#
-# print("done")
 
 def CheckLineIsFull(window, slot):
     for row in window:
@@ -172,19 +174,7 @@ def CheckAreaIsFull(window, startSlot, size):
 def CheckAvailSlots(row):
     return row[AVAIL_SLOTS_INDEX]
 
-def UpdateSizeOuter(length, startT, depth):
-    windowLength    = length
-    newFrames       = []
-    if windowLength < startT + depth + STRT_WNDW_SIZE:
-        for x in range(10 * (startT + depth + STRT_WNDW_SIZE - windowLength)):
-            row     = []
-            row.append(MAX_NUM_FREQ)
-            row.append([EMPTY] * MAX_NUM_FREQ)
-            newFrames.append(row)
-
-        return newFrames
-
-def GetListOfOpenSpaces(timeWindow, size):
+def GetListOfOpenSpaces(timeWindow, size, scale=0):
     listOfSpaces = []  # List of spaces of size(size) in the current row
 
     i = 0
@@ -207,7 +197,6 @@ def GetListOfOpenSpaces(timeWindow, size):
             listOfSpaces.append(startSlot)
             startSlot += 1
         i += 1
-
     return listOfSpaces  # If at least one suitable space is found, return true and the list of suitable spaces
 
 def PrintGraphic(window, start, end, startOffset = 0):

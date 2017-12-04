@@ -449,8 +449,12 @@ class Network:
         startS  = prov.sSlot
         size    = prov.nSlots
         self.tempProvResData.pop(i)
-        for link in path:
-            self.linkDict[link].RemoveProvFromWindow(startD, depth, startS, size)
+        try:
+            for link in path:
+                self.linkDict[link].RemoveProvFromWindow(startD, depth, startS, size)
+        except:
+            print("HERE", startD, depth)
+            raise
 
     def CheckReprovision(self, res, time):
         tempLinkDict    = {}
@@ -676,8 +680,19 @@ class Network:
             numRes = len(self.initialResList)
         self.SortInitResByArrivalT()
 
+        linkNames = []
+        for link in self.linkDict:
+            linkNames.append(link)
+
         maxTime = self.initialResList[-1].GetStartT() + 100 + STRT_WNDW_RANGE
         for time in range(0, maxTime):
+            try:
+                if (time % UpdateTimeCheck) == 0 and time != 0:
+                        print("Updating Links at", time)
+                        for link in linkNames:
+                            self.linkDict[link].UpdateSize(time)
+            except:
+                raise
             self.time = time
             i = 0
             allocated_Index.clear()

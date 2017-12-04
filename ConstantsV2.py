@@ -1,5 +1,4 @@
 MAX_NUM_FREQ    = 128
-TIME_WNDW_SIZE  = 5000       # Initial time window size
 MAX_SLOT_SIZE   = 12.5
 MAX_REQ_SIZE    = 200
 STRT_WNDW_SIZE  = 0
@@ -15,8 +14,15 @@ TIME_WINDOW_INDEX   = 1     # index of actual implementation of time window
 
 NumNodes        = 14
 NumRes          = 50000
-NumTrials       = 40
+NumTrials       = 1
 NumLambdas      = 1
+
+# Values for updating time window as to keep it relatively small scaled
+# Size must be at least max hold_t + STRT_WNDW_RANGE higher than update time
+UpdateTimeCheck = 600                   # Update every 700 time units.
+UpdateTimeSize  = UpdateTimeCheck + 400 # Size of window after update.
+InitWindowSize  = 1000                  # Initial time window size
+UpdateTimeToAdd = UpdateTimeSize - (InitWindowSize - UpdateTimeCheck)
 
 guard_band      = 1
 Mu              = 0.05
