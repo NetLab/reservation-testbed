@@ -16,13 +16,6 @@ class Link:
 
         self.nodes          = nodes
         self.length         = length
-        self.onFirstLink    = True
-        self.initResList    = []
-        self.currResList    = []
-        self.fwdResList     = []
-        self.curTime        = 0
-        self.numBlocks      = 0
-        self.provResList    = []
         self.windowScale    = 0
 
     # ===================================== R e s e r v a t i o n   W i n d o w ===================================
@@ -52,10 +45,9 @@ class Link:
         startT = self.ScaleStartTime(startT)
         return CheckAreaIsFull(self.timeWindow[startT:startT+depth], startSlot, size)
 
-
-    def GetTimeAvailSlots(self, startT, depth):
-        startT = self.ScaleStartTime(startT)
-        return self.availSlots[startT]
+    def GetTimeAvailSlots(self, time):
+        scaledTime = self.ScaleStartTime(time)
+        return self.availSlots[scaledTime]
 
     def CheckLineFull(self, startT, slot, depth):
         startT = self.ScaleStartTime(startT)
@@ -117,6 +109,29 @@ class Link:
             print(numSlotsFilled, size, depth)
             raise
 
+    def PlaceRes_NoCheck(self, startDepth, depth, startSlot, size, isProv, resNum, baseStartT=None):
+        numSlotsFilled = 0
+        startDepth = self.ScaleStartTime(startDepth)
+        for row in range(startDepth, startDepth + depth):
+            try:
+                self.availSlots[row] -= size
+            except IndexError:
+                print("Link", self.nodes, "is of invalid length", len(self.timeWindow), "for res from", startDepth,
+                      "to", startDepth + depth)
+                raise
+        for i in range(depth):
+            for j in range(size):
+                if j == 0 and i == 0:
+                    if isProv == False:
+                        self.timeWindow[startDepth + i][startSlot + j] = START
+                    else:
+                        self.timeWindow[startDepth + i][startSlot + j] = PROV
+                else:
+                    if isProv == False:
+                        self.timeWindow[startDepth + i][startSlot + j] = FULL
+                    else:
+                        self.timeWindow[startDepth + i][startSlot + j] = PROV
+
     # ================================= P r o v i s i o n i n g   F u n c t i o n s ===============================
 
     def RemoveProvFromWindow(self, startDepth, depth, startSlot, size):
@@ -135,6 +150,16 @@ class Link:
                     print("From", startSlot, scaledStart, "to", endS, endD)
                     print("Window Scale", self.windowScale)
                     raise
+
+    def RemoveProvFromWindow_NoCheck(self, startDepth, depth, startSlot, size):
+
+        scaledStart = self.ScaleStartTime(startDepth)
+        endD = scaledStart + depth
+        endS = startSlot + size
+
+        for row in range(scaledStart, endD):
+            for column in range(startSlot, endS):
+                self.timeWindow[row][column] = EMPTY
 
     def GetWindowCopy(self, startT, endT):
         startT = self.ScaleStartTime(startT)

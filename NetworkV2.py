@@ -23,6 +23,8 @@ class Network:
         self.completedRes       = 0
         self.immediateBlocking  = 0
         self.promisedBlocking   = 0
+        self.successfulReprov   = 0
+        self.unsuccessfulReprov = 0
 
         self.debugFirstLink     = 0
         self.DEBUG_ResNum       = []
@@ -282,7 +284,7 @@ class Network:
             i = 0
 
             for link in listLinks:
-                linkAvail = self.linkDict[link].GetTimeAvailSlots(checkTime, holdT)
+                linkAvail = self.linkDict[link].GetTimeAvailSlots(checkTime)
                 if linkAvail <= leastAvail:
                     leastAvail = linkAvail
                     linkToCheck = i
@@ -341,7 +343,7 @@ class Network:
         linkList        = res.GetPath()
         pathProvisions  = self.GetPathTempProv(linkList)
 
-        maxTime = resStartT + res.GetHoldingT() + STRT_WNDW_SIZE
+        maxTime = resStartT + res.GetHoldingT() + STRT_WNDW_SIZE + 20
 
         if len(pathProvisions) > 0:
             if SMALL_OR_large_WINDOW:
@@ -383,25 +385,26 @@ class Network:
             for link in provPath:
                 for i in range(provStartD, provEndD):
                     for j in range(provStartS, provEndS):
-                        try:
-                            if tempLinkDict[link][i][j] == PROV:
-                                tempLinkDict[link][i][j] = EMPTY
-                            else:
-                                PrintGraphic(tempLinkDict[link], 0, -1)
-                                print(i+minTime,j, provSize)
-                                print("Link", link, "on", provPath)
-                                print("From ", provStartD, "to", provEndD, "and", provStartS, "to", provEndS)
-                                print(tempLinkDict[link][i][j] )
-                                print("Max window size", maxWindowBound)
-                                raise
-                        except IndexError:  # DEBUG, REMOVE
-                            print(i, j)
-                            print("From ", provStartD, "to", provDepth, "and", provStartS, "to", provSize)
-                            print("With window from", minTime, "to", maxWindowBound)
-                            print(len(tempLinkDict[link]))
-                            print(len(tempLinkDict[link][i]))
-                            print(len(tempLinkDict[link][i][j]))
-                            raise
+                        tempLinkDict[link][i][j] = EMPTY
+                        #try:
+                        #    if tempLinkDict[link][i][j] == PROV:
+                        #        tempLinkDict[link][i][j] = EMPTY
+                            #else:
+                            #    PrintGraphic(tempLinkDict[link], 0, -1)
+                            #    print(i+minTime,j, provSize)
+                            #    print("Link", link, "on", provPath)
+                            #    print("From ", provStartD, "to", provEndD, "and", provStartS, "to", provEndS)
+                            #    print(tempLinkDict[link][i][j] )
+                            #    print("Max window size", maxWindowBound)
+                            #    raise
+                        #except IndexError:  # DEBUG, REMOVE
+                        #    print(i, j)
+                        #    print("From ", provStartD, "to", provDepth, "and", provStartS, "to", provSize)
+                        #    print("With window from", minTime, "to", maxWindowBound)
+                        #    print(len(tempLinkDict[link]))
+                        #    print(len(tempLinkDict[link][i]))
+                        #    print(len(tempLinkDict[link][i][j]))
+                        #    raise
         return tempLinkDict
 
     def PopProvisions(self, pathProvisions):
@@ -431,6 +434,25 @@ class Network:
 
         return tempProvResList
 
+    def CheckEnoughSpace(self, res):
+        startT  = res.GetStartT()
+        depth   = res.GetHoldingT()
+        size    = res.GetNumSlots()
+        for link in res.path:
+            numConcurrentRows = 0
+            linkHasSpace = False
+            for line in range(startT, startT + depth + STRT_WNDW_SIZE):
+                if self.linkDict[link].GetTimeAvailSlots(line) < size:
+                    numConcurrentRows = 0
+                else:
+                    numConcurrentRows += 1
+                if numConcurrentRows >= depth:
+                    linkHasSpace = True
+                    break
+            if linkHasSpace == False:
+                return False
+        return True
+
     def ClearProvAcrossLinks(self, resData):
         resID = resData.resNum
         foundProv = False
@@ -451,7 +473,7 @@ class Network:
         self.tempProvResData.pop(i)
         try:
             for link in path:
-                self.linkDict[link].RemoveProvFromWindow(startD, depth, startS, size)
+                self.linkDict[link].RemoveProvFromWindow_NoCheck(startD, depth, startS, size)
         except:
             print("HERE", startD, depth)
             raise
@@ -462,6 +484,9 @@ class Network:
         relevantLinks   = copy(listLinks)
         tempResCoords   = {}
         newReprovResList = []
+
+        #if self.CheckEnoughSpace(res) == False:
+        #    return False
 
         minTime, minWindowBase, maxTime, maxWindowBound, pathProvisions = self.GetReproWindow(res)
         if len(pathProvisions) <= 0: # minTime is set to "None" if no reservations may be reprovisioned at this time
@@ -619,7 +644,7 @@ class Network:
 
         for link in links:
             try:
-                self.linkDict[link].PlaceRes(startT, holdingT, startSlot, size, isProv, resNum, baseStartT=baseStartT)
+                self.linkDict[link].PlaceRes_NoCheck(startT, holdingT, startSlot, size, isProv, resNum, baseStartT=baseStartT)
             except:
                 print("On link", link, "of links", links)
                 print("Error at", startT, startSlot, "of size", size, holdingT)
@@ -688,7 +713,6 @@ class Network:
         for time in range(0, maxTime):
             try:
                 if (time % UpdateTimeCheck) == 0 and time != 0:
-                        print("Updating Links at", time)
                         for link in linkNames:
                             self.linkDict[link].UpdateSize(time)
             except:
@@ -745,6 +769,9 @@ class Network:
                         wasReprovisioned = self.CheckReprovision(res, time)
                         if wasReprovisioned == False:
                             self.immediateBlocking += 1
+                            self.unsuccessfulReprov += 1
+                        else:
+                            self.successfulReprov += 1
 
                     arrivedOrIBlocked_Index.append(i)
             # Sort indexes from high to low as deleting and index reindexes earlier entries
@@ -770,6 +797,7 @@ class Network:
             print("Of", numRes, "initial reservations")
             print("Reservations Completed", self.completedRes)
             print("Total number of blocks:", totalBlocking, "\n", localBlocking, "blocked initially and", linkBlocking, "due to conflict")
+            print("Number of attempted reprovisions:", self.unsuccessfulReprov + self.successfulReprov, "Number of success:", self.successfulReprov)
 
         if(numRes != totalBlocking + self.completedRes):
             ReportError("MainFunction", "Not all of {0} reservations blocked: {1}, or completed: {2}".format(numRes, totalBlocking, self.completedRes))
@@ -782,6 +810,9 @@ class Network:
     def PrintGraphics(self, link, end, all=False):
         print("Link:", link)
         self.linkDict[link].PrintGraphic(end)
+
+    def ReportError(self, errorMsg):
+        self.errorQueue.puts(errorMsg)
 
 
 class NetworkError(Exception):
@@ -808,30 +839,41 @@ def ReportResults(indexLambda, avgComp, avgImme, avgProm):
 #    report.write(str(LambdaList[indexLambda]) + ' ' + str(avgComp) + ' ' + str(avgImme) + ' ' + str(avgProm))
     report.close()
 
-def RunTrial(indexLambda, detailed=False, debugGraphic = False):
+def RunTrial(args, detailed=False, debugGraphic = False):
+    indexLambda = args[0]
+    resultsQueue = args[1]
+
     avgTime = 0
     avgComp = 0
     avgImme = 0
     avgProm = 0
     myLambda = LambdaList[indexLambda]
-    for x in range(NumTrials):
-        seedInt = indexLambda * x ^x
-        test = Network(NumNodes, LinkList)
-        complete, immediate, promised, time = test.MainFunction(myLambda, NumRes, seedInt, info=True)
-        avgTime += time
-        avgComp += complete
-        avgImme += immediate
-        avgProm += promised
-    avgTime = avgTime / NumTrials
-    avgComp = avgComp / NumTrials
-    avgImme = avgImme / NumTrials
-    avgProm = avgProm / NumTrials
 
-    if detailed:
-        print("total time for lambda", myLambda, "was", avgTime * NumTrials, "with an average of", avgTime, "seconds")
-    if debugGraphic:
-        test.PrintGraphics()
-    ReportResults(indexLambda, avgComp, avgImme, avgProm)
+    try:
+        for x in range(NumTrials):
+            seedInt = indexLambda * x ^x
+            test = Network(NumNodes, LinkList)
+            complete, immediate, promised, time = test.MainFunction(myLambda, NumRes, seedInt, info=True)
+            avgTime += time
+            avgComp += complete
+            avgImme += immediate
+            avgProm += promised
+        avgTime = avgTime / NumTrials
+        avgComp = avgComp / NumTrials
+        avgImme = avgImme / NumTrials
+        avgProm = avgProm / NumTrials
+
+        if detailed:
+            print("total time for lambda", myLambda, "was", avgTime * NumTrials, "with an average of", avgTime, "seconds")
+        if debugGraphic:
+            test.PrintGraphics()
+        ReportResults(indexLambda, avgComp, avgImme, avgProm)
+        if resultsQueue != None:
+            resultsQueue.put([myLambda, (avgImme + avgProm)/NumRes, avgTime])
+    except BaseException as errorMsg:
+        if resultsQueue != None:
+            resultsQueue.put([myLambda, "Failed on lambda {0}\n".format(myLambda) + str(errorMsg)])
+        raise
 
 def TestingRun( ResList):
     listOfInvolvedLinks = []
@@ -854,7 +896,7 @@ def TestingRun( ResList):
 
 
 if __name__ == '__main__':
-    RunTrial(0, detailed=True, debugGraphic=False)
+    RunTrial([16, None], detailed=True, debugGraphic=False)
     #TestingRun(TestResList)
 #    test = Network(NumNodes, LinkList)
 #    test.TestRes()

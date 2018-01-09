@@ -1,27 +1,26 @@
 MAX_NUM_FREQ    = 128
 MAX_SLOT_SIZE   = 12.5
 MAX_REQ_SIZE    = 200
-STRT_WNDW_SIZE  = 0
+STRT_WNDW_SIZE  = 1 # Start window size. When 0, no start window
 STRT_WNDW_RANGE = STRT_WNDW_SIZE + 1
-REMOVE_TRUE     = False
 
 SMALL = True
 LARGE = False
 SMALL_OR_large_WINDOW   = SMALL
-
-AVAIL_SLOTS_INDEX   = 0     # Index of available slots is the last index in the array
-TIME_WINDOW_INDEX   = 1     # index of actual implementation of time window
 
 NumNodes        = 14
 NumRes          = 50000
 NumTrials       = 1
 NumLambdas      = 1
 
+AVAIL_SLOTS_INDEX   = 0     # Index of available slots is the last index in the array
+TIME_WINDOW_INDEX   = 1     # index of actual implementation of time window
+
 # Values for updating time window as to keep it relatively small scaled
 # Size must be at least max hold_t + STRT_WNDW_RANGE higher than update time
 UpdateTimeCheck = 600                   # Update every 700 time units.
-UpdateTimeSize  = UpdateTimeCheck + 400 # Size of window after update.
-InitWindowSize  = 1000                  # Initial time window size
+UpdateTimeSize  = UpdateTimeCheck + 600 # Size of window after update.
+InitWindowSize  = 1200                  # Initial time window size
 UpdateTimeToAdd = UpdateTimeSize - (InitWindowSize - UpdateTimeCheck)
 
 guard_band      = 1
